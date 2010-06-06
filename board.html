@@ -1,0 +1,46 @@
+<html>
+	<head>
+		<!-- include all the relevant JS -->
+	</head>
+<body>
+
+	<!-- top: opponent hand (8 blank card backs) -->
+	<div id="opponentHand" class="hand">
+%for i in range(0, 8):
+		<img class="handCard" src="images/blank.png" alt="Blank card" id="opponent_${i}" />
+%endfor
+	</div>
+
+	<!-- nearby: opponent captures (4 rows of cards?) -->
+	<div id="opponentCaptures" class="captures">
+		<!-- should stick a basic layout in here... -->
+	</div>
+
+	<!-- middle L: field (2x5) -->
+	<div id="fieldCards" class="field">
+		<!-- table? -->
+	</div>
+
+	<div id="dataBox" class="databox">
+	</div>
+	<!-- middle R: scores, current multiplier, other status -->
+
+	<!-- bottom: player hand (8 face-up cards) -->
+	<div id="playerHand" class="hand">
+%for i in range(0, 8):
+		<img class="handCard" src="images/blank.png" alt="Blank card" id="player_${i}" />
+%endfor	
+	</div>
+	
+	<!-- bottom R: player captures (4 rows) -->
+	<div id="opponentCaptures" class="captures">
+		<!-- should stick a basic layout in here... -->
+	</div>
+
+	<div id="koikoiPrompt" class="prompt" style="display:none;">
+		<span onclick="koikoi()">Koi</span>
+		<span onclick="endGame()">Game</span>
+	</div>
+
+</body>
+</html>

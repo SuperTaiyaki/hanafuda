@@ -1,0 +1,91 @@
+
+# january
+- month:
+        # jan 1 (bright, crane)
+        - img: jan1.png
+          attribute: bright # 20 pts
+        - img: "jan2.png"
+          attribute: redslip # 5 pts
+        - img: "jan3.png" # nothing -> junk
+        - img: "jan4.png"
+- month:
+        - img: "feb1.png"
+          attribute: animal
+        - img: "feb2.png"
+          attribute: redslip
+        - img: "feb3.png"
+        - img: "feb4.png"
+- month:
+        # mar 3 (bright, curtain)
+        - img: "mar1.png"
+          attribute: curtain
+        - img: "mar2.png"
+          attribute: redslip
+        - img: "mar3.png"
+        - img: "mar4.png"
+- month:
+        - img: "apr1.png"
+          attribute: animal
+        - img: "apr2.png"
+          attribute: slip # generic slip is blank red slip
+        - img: "apr3.png"
+        - img: "apr4.png"
+- month:
+        - img: "may1.png" # the bridge, nothing special
+          attribute: animal
+        - img: "may2.png"
+          attribute: slip
+        - img: "may3.png"
+        - img: "may4.png"
+- month:
+        - img: "jun1.png"
+          attribute: isc # part of ino shika chou (B.D.B)
+        - img: "jun2.png"
+          attribute: blueslip
+        - img: "jun3.png"
+        - img: "jun4.png"
+- month:
+        - img: "jul1.png"
+          attribute: isc
+        - img: "jul2.png"
+          attribute: slip
+        - img: "jul3.png"
+        - img: "jul4.png"
+- month:
+        - img: "aug1.png"
+          attribute: moon # bright, the moon
+        - img: "aug2.png"
+          attribute: animal
+        - img: "aug3.png"
+        - img: "aug4.png"
+- month:
+        - img: "sep1.png"
+          attribute: cup # special card, the sake cup
+        - img: "sep2.png"
+          attribute: blueslip
+        - img: "sep3.png"
+        - img: "sep4.png"
+- month:
+        - img: "oct1.png"
+          attribute: animal
+          attribute: isc # part of ino shika chou (B.D.B)
+        - img: "oct2.png"
+          attribute: slip
+          attribute: blueslip
+        - img: "oct3.png"
+        - img: "oct4.png"
+- month:
+        - img: "nov1.png"
+          attribute: rainman # technically a bright
+        - img: "nov2.png"
+          attribute: animal
+        - img: "nov3.png"
+          attribute: slip
+        - img: "nov4.png"
+- month:
+        - img: "dec1.png" # dec 1, the phoenix
+          attribute: bright
+        - img: "dec2.png"
+        - img: "dec3.png"
+        - img: "dec4.png"
+
