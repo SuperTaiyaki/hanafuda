@@ -3,6 +3,7 @@
 //jquery should be loaded
 
 var cardMatch = new Array(100); // safe value... stupid, but meh
+var dragging = false;
 
 function updateMatch(hand, field) {
 	cardMatch[hand] = field;
@@ -18,9 +19,14 @@ function markMatched(hand) {
 	var i;
 	for (i = 0; i < matched.length;i++) {
 		var el = $("#field_" + matched[i]);
-		el.effect("pulsate", {times:1}, 2000);
+		//el.effect("pulsate", {times:1}, 2000);
+		el.addClass("cardHighlight");
 	}
 	return;
+}
+function unmark() {
+	if (!dragging)
+		$(".fieldCard").removeClass("cardHighlight");
 }
 
 function log(msg) {
@@ -52,13 +58,17 @@ function init() {
 
 	//set up the dragging functionality
 	//need to make the original disappear somehow...
-	$("#playerHand > .handCard").draggable({helper: 'clone'});
+	$("#playerHand > .handCard").draggable({helper: 'clone',
+			start: function(event, ui) {
+				dragging = true; //need to mark the original somehow
+				},
+			stop: function() {dragging = false;unmark();}});
 	$("#playerHand > .handCard").hover(function() {
 			//substr 7: is the start of the number after field_
 			id = $(this).get(0).id.substr(7, 3);
 			markMatched(id);
 			}, function() {
-			return;
+			unmark();
 			});
 
 }

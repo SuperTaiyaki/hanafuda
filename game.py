@@ -61,9 +61,11 @@ class Game:
 			return -1 # exception, trying to match the deck suit to
 					# something random
 
+		# No error, so flip the player now
+
 		# prepare the return stuff
 		caps = []
-		field = []
+		ret_field = []
 		deck = None
 
 		# Match the existing card
@@ -73,7 +75,7 @@ class Game:
 			idx = self.field.index(None)
 			# that will bug out if the field ever fills...
 			self.field[idx] = self.hands[player][hand]
-			field.append(self.hands[player][hand])
+			ret_field.append(self.hands[player][hand])
 			self.hands[player][hand] = None
 		else:
 			# Actually matching something
@@ -92,21 +94,26 @@ class Game:
 			# Nothing matches, put it into the field
 			idx = self.field.index(None)
 			self.field[idx] = card
-			field.append(card)
+			ret_field.append(card)
 		elif len(matches) == 1:
 			# Only one match, take both cards
 			match = matches[0]
 			self.captures[player].extend([self.field[match], card])
-			caps.extind([self.field[match], card])
+			caps.extend([self.field[match], card])
 			self.field[match] = None
 		else:
 			# More than one match, need the player to choose
 			self.deck_top = card
 			deck = card
-		return {'captures': caps, 'field': field, 'deck': deck}
+		# if deck is set the player needs to force a match, turn isn't
+		# over
+		# TODO: This will also need to check for fresh yakus
+		if not deck:
+			self.player = 1 if self.player == 0 else 0
+		return {'captures': caps, 'field': ret_field, 'deck': deck}
 	
 	def score(self, player):
-		return cards.score_hand(self.hands[player])
+		return cards.score_hand(self.captures[player])
 		
 	def _search_field(self, suit):
 		res = []
@@ -126,6 +133,8 @@ def test():
 	print ("Field:")
 	print g.get_field()
 	
+def itest():
+	return Game(cards.create_deck(), 0)
 
 #test()
 

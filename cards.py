@@ -18,7 +18,7 @@ class Card:
 		self.rank = 1
 
 	def __repr__(self):
-		out = "CARD\nSuit: %i\nRank: %i\nAttrs: %s\n" % (self.suit, self.rank,
+		out = "\nCARD Suit: %i Rank: %i Attrs: %s" % (self.suit, self.rank,
 				self.attrs)
 		return out
 
@@ -122,11 +122,11 @@ def score_hand(hand):
 	if score > 0:
 		yaku.append(comment)
 	
-	for yaku in scoring:
-		f = filter(yaku['filter'], hand)
-		if len(f) >= yaku['count']:
-			score += yaku['score'][0](len(f))
-			yaku.append(yaku['score'][1])
+	for y in scoring:
+		f = filter(y['filter'], hand)
+		if len(f) >= y['count']:
+			score += y['score'][0](len(f))
+			yaku.append(y['score'][1])
 	return (score, yaku)
 
 
