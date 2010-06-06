@@ -2,90 +2,90 @@
 # january
 - month:
         # jan 1 (bright, crane)
-        - img: jan1.png
+        - img: jan1.gif
           attribute: bright # 20 pts
-        - img: "jan2.png"
+        - img: "jan2.gif"
           attribute: redslip # 5 pts
-        - img: "jan3.png" # nothing -> junk
-        - img: "jan4.png"
+        - img: "jan3.gif" # nothing -> junk
+        - img: "jan4.gif"
 - month:
-        - img: "feb1.png"
+        - img: "feb1.gif"
           attribute: animal
-        - img: "feb2.png"
+        - img: "feb2.gif"
           attribute: redslip
-        - img: "feb3.png"
-        - img: "feb4.png"
+        - img: "feb3.gif"
+        - img: "feb4.gif"
 - month:
         # mar 3 (bright, curtain)
-        - img: "mar1.png"
+        - img: "mar1.gif"
           attribute: curtain
-        - img: "mar2.png"
+        - img: "mar2.gif"
           attribute: redslip
-        - img: "mar3.png"
-        - img: "mar4.png"
+        - img: "mar3.gif"
+        - img: "mar4.gif"
 - month:
-        - img: "apr1.png"
+        - img: "apr1.gif"
           attribute: animal
-        - img: "apr2.png"
+        - img: "apr2.gif"
           attribute: slip # generic slip is blank red slip
-        - img: "apr3.png"
-        - img: "apr4.png"
+        - img: "apr3.gif"
+        - img: "apr4.gif"
 - month:
-        - img: "may1.png" # the bridge, nothing special
+        - img: "may1.gif" # the bridge, nothing special
           attribute: animal
-        - img: "may2.png"
+        - img: "may2.gif"
           attribute: slip
-        - img: "may3.png"
-        - img: "may4.png"
+        - img: "may3.gif"
+        - img: "may4.gif"
 - month:
-        - img: "jun1.png"
+        - img: "jun1.gif"
           attribute: isc # part of ino shika chou (B.D.B)
-        - img: "jun2.png"
+        - img: "jun2.gif"
           attribute: blueslip
-        - img: "jun3.png"
-        - img: "jun4.png"
+        - img: "jun3.gif"
+        - img: "jun4.gif"
 - month:
-        - img: "jul1.png"
+        - img: "jul1.gif"
           attribute: isc
-        - img: "jul2.png"
+        - img: "jul2.gif"
           attribute: slip
-        - img: "jul3.png"
-        - img: "jul4.png"
+        - img: "jul3.gif"
+        - img: "jul4.gif"
 - month:
-        - img: "aug1.png"
+        - img: "aug1.gif"
           attribute: moon # bright, the moon
-        - img: "aug2.png"
+        - img: "aug2.gif"
           attribute: animal
-        - img: "aug3.png"
-        - img: "aug4.png"
+        - img: "aug3.gif"
+        - img: "aug4.gif"
 - month:
-        - img: "sep1.png"
+        - img: "sep1.gif"
           attribute: cup # special card, the sake cup
-        - img: "sep2.png"
+        - img: "sep2.gif"
           attribute: blueslip
-        - img: "sep3.png"
-        - img: "sep4.png"
+        - img: "sep3.gif"
+        - img: "sep4.gif"
 - month:
-        - img: "oct1.png"
+        - img: "oct1.gif"
           attribute: animal
           attribute: isc # part of ino shika chou (B.D.B)
-        - img: "oct2.png"
+        - img: "oct2.gif"
           attribute: slip
           attribute: blueslip
-        - img: "oct3.png"
-        - img: "oct4.png"
+        - img: "oct3.gif"
+        - img: "oct4.gif"
 - month:
-        - img: "nov1.png"
+        - img: "nov1.gif"
           attribute: rainman # technically a bright
-        - img: "nov2.png"
+        - img: "nov2.gif"
           attribute: animal
-        - img: "nov3.png"
+        - img: "nov3.gif"
           attribute: slip
-        - img: "nov4.png"
+        - img: "nov4.gif"
 - month:
-        - img: "dec1.png" # dec 1, the phoenix
+        - img: "dec1.gif" # dec 1, the phoenix
           attribute: bright
-        - img: "dec2.png"
-        - img: "dec3.png"
-        - img: "dec4.png"
+        - img: "dec2.gif"
+        - img: "dec3.gif"
+        - img: "dec4.gif"
 

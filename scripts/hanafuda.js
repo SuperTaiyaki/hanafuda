@@ -2,7 +2,7 @@
 // the list of matchable cards
 //jquery should be loaded
 
-var cardMatch = []
+var cardMatch = new Array(100); // safe value... stupid, but meh
 
 function updateMatch(hand, field) {
 	cardMatch[hand] = field;
@@ -13,18 +13,54 @@ function getMatch(hand) {
 	return cardMatch[hand];
 }
 
+function markMatched(hand) {
+	var matched = cardMatch[hand];
+	var i;
+	for (i = 0; i < matched.length;i++) {
+		var el = $("#field_" + matched[i]);
+		el.effect("pulsate", {times:1}, 2000);
+	}
+	return;
+}
+
+function log(msg) {
+	window.opera.postError(msg);
+}
+
 function init() {
-	// could insert a second argument here with... something useful?
 	$.getJSON('ajax/init', function(json) {
-			//hand
-			//card matches
 			var i;
+			//hand
+			for (i = 0;i < 8;i++) {
+				var cn = "#player_" + i;
+				$(cn).get(0).src = json.hand[i];
+			}
+			//card matches
 			for (i = 0;i < 8;i++) {
 				updateMatch(i, json.matches[i]);
 			}
 			//field
+			for (i = 0;i < 8;i++) {
+				if (json.field[i] == "blank") {
+					// need to blank it somehow...
+				}
+				var cn = "#field_" + i;
+				$(cn).get(0).src = json.field[i];
+			}
 			//dealer?
 	});
+
+	//set up the dragging functionality
+	//need to make the original disappear somehow...
+	$("#playerHand > .handCard").draggable({helper: 'clone'});
+	$("#playerHand > .handCard").hover(function() {
+			//substr 7: is the start of the number after field_
+			id = $(this).get(0).id.substr(7, 3);
+			markMatched(id);
+			}, function() {
+			return;
+			});
+
 }
 
 /* User took one of their cards and placed it, either on a matched card on an
@@ -83,4 +119,9 @@ function endGame() {
 			//dunno
 	});
 }
+
+$(document).ready(function() {
+		init();
+		});
+
 

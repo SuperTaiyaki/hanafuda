@@ -1,13 +1,19 @@
 <html>
 	<head>
 		<!-- include all the relevant JS -->
+		<script type="text/javascript" src="scripts/jquery.js">
+		</script>
+		<script type="text/javascript" src="scripts/jquery-ui-1.8.2.custom.min.js">
+		</script>
+		<script type="text/javascript" src="scripts/hanafuda.js">
+		</script>
 	</head>
 <body>
 
 	<!-- top: opponent hand (8 blank card backs) -->
 	<div id="opponentHand" class="hand">
 %for i in range(0, 8):
-		<img class="handCard" src="images/blank.png" alt="Blank card" id="opponent_${i}" />
+		<img class="handCard" src="img/back.gif" alt="Blank card" id="opponent_${i}" />
 %endfor
 	</div>
 
@@ -19,6 +25,18 @@
 	<!-- middle L: field (2x5) -->
 	<div id="fieldCards" class="field">
 		<!-- table? -->
+		<table>
+			<tr>
+%for i in range(0, 10, 2):
+<td><img src="img/back.gif" id="field_${i}" /></td>
+%endfor
+			</tr>
+			<tr>
+%for i in range(1, 10, 2):
+<td><img src="img/back.gif" id="field_${i}" /></td>
+%endfor
+			</tr>
+		</table>
 	</div>
 
 	<div id="dataBox" class="databox">
@@ -28,12 +46,12 @@
 	<!-- bottom: player hand (8 face-up cards) -->
 	<div id="playerHand" class="hand">
 %for i in range(0, 8):
-		<img class="handCard" src="images/blank.png" alt="Blank card" id="player_${i}" />
+		<img class="handCard" src="img/back.gif" alt="Blank card" id="player_${i}" />
 %endfor	
 	</div>
 	
 	<!-- bottom R: player captures (4 rows) -->
-	<div id="opponentCaptures" class="captures">
+	<div id="playerCaptures" class="captures">
 		<!-- should stick a basic layout in here... -->
 	</div>
 

@@ -1,0 +1,12 @@
+[global]
+tools.sessions.on = True
+tools.staticdir.root = '/home/rek/code/hanafuda'
+[/]
+
+[/img]
+tools.staticdir.on: True
+tools.staticdir.dir: 'img'
+[/scripts]
+tools.staticdir.on: True
+tools.staticdir.dir: 'scripts'
+
