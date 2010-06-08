@@ -1,8 +1,11 @@
 import cards
 import random
 
+class GameError(Exception):
+	pass
+
 class Game:
-	FIELD_SIZE = 10
+	FIELD_SIZE = 12 # maximum possible
 	# Dealer should be 0 or 1
 	def __init__(self, deck, dealer = -1):
 		# "the total number of permutations of x is larger than the
@@ -27,6 +30,7 @@ class Game:
 			dealer = random.randint(0, 1)
 		self.dealer = dealer
 		self.player = dealer
+		self.active_players = 0
 		
 		self.multiplier = 1
 
@@ -41,6 +45,8 @@ class Game:
 
 	def get_field(self):
 		return self.field
+	def get_deck_top(self):
+		return self.deck_top
 
 	def hand_match(self, player):
 		# For each item in the hand make a list of matching items in the
@@ -54,14 +60,21 @@ class Game:
 		return ret
 
 	def play(self, player, hand, field):
+		print("Player: ", player, " Hand: ", hand, " Field: ", field)
 		if player != self.player:
-			return -1 # exception, wrong player
-		if hand != -1 and field != -1 and self.field[field].suit != self.hands[player][hand].suit:
-			return -1 # exception, suits don't match
+			raise GameError("Wrong player's turn")
+		if hand != -1 and self.field[field] != None and self.field[field].suit != self.hands[player][hand].suit:
+			print self.field[field]
+			print self.hands[player][hand]
+			raise GameError("Suits don't match")
 		if hand == -1 and self.deck_top.suit != self.field[field].suit:
-			return -1 # exception, trying to match the deck suit to
-					# something random
-
+			raise GameError("Deck card must match field card")
+			# exception, trying to match the deck suit to
+			# something random
+		# Player trying to not match when matches exist
+		if self.field[field] == None and \
+				len(self._search_field(self.hands[player][hand].suit)) > 0:
+			raise GameError("Card must match field card")
 
 		# prepare the return stuff
 		# caps is going to be weird
@@ -72,7 +85,7 @@ class Game:
 		#deck = None
 
 		# Match the existing card
-		if field == -1:
+		if self.field[field] == None:
 			# Just sending it to the field
 			# Grab the first available slot
 			idx = self.field.index(None)

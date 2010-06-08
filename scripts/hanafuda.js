@@ -17,6 +17,10 @@ function clear_suit(el) {
 }
 
 function update(json) {
+	if (json.error) {
+		alert(json.error);
+		return;
+	}
 	var i;
 	if (json.field) {
 		for (i = 0;i < json.field.length;i++) {
@@ -51,16 +55,36 @@ function update(json) {
 	}
 	if (json.caps_opp) {
 		//update opponent's captures
+		for (i = 0;i < json.caps_opp.length;i++) {
+			var img = "<img src=\"" + json.caps_opp[i].img + "\" />";
+			$("#opponentCaptures img:last-child").after(img);
+		}
 	}
 	if (json.opp) {
 		//update opponent's hand
+	}
+
+	if (json.deck) {
+		$("#deckCard").attr('src', json.deck.img);
+		// a little messy, need to set up for the player to select
+	} else {
+		$("#deckCard").attr('src', "img/back.gif");
+	}
+	
+	//need to handle other stuff like koikoi prompt and card selection
+	//
+	
+	if (!json.active) {
+		$("#playerHand").addClass("handDisabled");
+		setTimeout("comet()", 500);
+	} else {
+		$("#playerHand").removeClass("handDisabled");
 	}
 }
 
 function comet() {
 	$.getJSON('update', function(json) {
-			update(json)
-			setTimeout("comet()", 500);
+			update(json);
 		});
 	return;
 }
@@ -70,18 +94,21 @@ function init() {
 			var i;
 			//hand
 			for (i = 0;i < 8;i++) {
+
 				var cn = "#player_" + i;
-				$(cn).get(0).src = json.hand[i].img;
-				$(cn).addClass(json.hand[i].suit)
-				$(cn).data('suit', json.hand[i].suit)
-				$(cn).data('id', i);
+				if (json.hand[i].suit == -1) {
+					$(cn).css('display', 'none');
+				} else {
+					$(cn).get(0).src = json.hand[i].img;
+					$(cn).addClass(json.hand[i].suit)
+					$(cn).data('suit', json.hand[i].suit)
+					$(cn).data('id', i);
+				}
 			}
 
 			//field
 			for (i = 0;i < 8;i++) {
-				if (json.field[i] == "blank") {
-					// need to blank it somehow...
-				}
+
 				var cn = "#field_" + i;
 				$(cn).get(0).src = json.field[i].img;
 				$(cn).addClass(json.field[i].suit);
@@ -94,6 +121,10 @@ function init() {
 
 
 			//dealer?
+			if (!json.active) {
+				$("#playerHand").addClass("handDisabled");
+				setTimeout('comet()', 500); //start the comet process going
+			}
 	});
 
 	
