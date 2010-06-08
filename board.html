@@ -29,18 +29,18 @@
 		<!-- should stick a basic layout in here... -->
 	</div>
 
-	<!-- middle L: field (2x5) -->
+	<!-- middle L: field (2x6) -->
 	<div id="fieldCards" class="field">
 		<!-- table? -->
 		<table>
 			<tr>
-%for i in range(0, 10, 2):
-<td><img src="img/back.gif" class="fieldCard" id="field_${i}" /></td>
+%for i in range(0, 12, 2):
+<td><img src="img/empty.gif" class="fieldCard" id="field_${i}" /></td>
 %endfor
 			</tr>
 			<tr>
-%for i in range(1, 10, 2):
-<td><img src="img/back.gif" class="fieldCard" id="field_${i}" /></td>
+%for i in range(1, 12, 2):
+<td><img src="img/empty.gif" class="fieldCard" id="field_${i}" /></td>
 %endfor
 			</tr>
 		</table>
@@ -60,6 +60,7 @@
 	<!-- bottom R: player captures (4 rows) -->
 	<div id="playerCaptures" class="captures">
 		<!-- should stick a basic layout in here... -->
+		<img style="display:none" /> <!-- is this illegal html? -->
 	</div>
 
 	<div id="koikoiPrompt" class="prompt" style="display:none;">

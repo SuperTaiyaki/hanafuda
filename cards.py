@@ -1,3 +1,5 @@
+# coding=utf8
+
 # Main hanafuda game handling class
 import yaml
 
@@ -77,66 +79,171 @@ def create_deck():
 		suit += 1
 	return cards
 
-def score_brights(hand):
-	brights = filter(lambda c: c.attrs.has_key('bright'), hand)
-	# 5 brights
-	if len(brights) == 5:
-		return (10, "Five Lights")
-	rainmain = len(filter(lambda c: c.attrs.has_key('rainmain'), brights)) > 0
-	if len(brights) == 4:
-		# rainy four
-		if rainmain:
-			return (7, "Four Lights")
-		else: # dry four
-			return (8, "Dry Four Lights")
-	if not rainmain and len(brights) == 3:
-		return (6, "Three Lights")
-	return (0, "")
 
-scoring = [
-		# red slips
-		{'filter': lambda c: c.attrs.has_key('redslip'), 'count': 3, 'score': (lambda x: 6, "Red Poems")},
-		# blue slips
-		{'filter': lambda c: c.attrs.has_key('blueslip'), 'count': 3, 'score': (lambda x: 6, "Blue Poems")},
-		# all slips
-		{'filter': lambda c: c.attrs.has_key('slip'), 'count': 5, 'score': (lambda x: x - 4,
-			"Poems")},
-		# ISC (may require fiddling for extra animal points
-		{'filter': lambda c: c.attrs.has_key('isc'), 'count': 3, 'score': (lambda x: 6,
-		"Boar Deer Butterfly")},
-		# plain animals
-		{'filter': lambda c: c.attrs.has_key('animal'), 'count': 5, 'score': (lambda x: x
-			- 4, "Animals")},
-		{'filter': lambda c: c.attrs.has_key('cup') or c.attrs.has_key('moon'), 'count': 2, 'score':
-			(lambda x: 5, "Moon viewing")},
-		{'filter': lambda c: c.attrs.has_key('cup') or c.attrs.has_key('curtain'), 'count': 2, 'score':
-			(lambda x: 5, "Flower viewing")},
-		# dregs
-		{'filter': lambda c: c.rank == 1, 'count': 10, 'score':
-			(lambda x: x - 9, "Basic")}]
-
-def score_hand(hand):
-	score = 0
-	yaku = []
-	(score, comment) = score_brights(hand)
-	if score > 0:
-		yaku.append(comment)
+class Yaku:
+	def __init__(self):
+		self.filter = None
+		self.count = 0
+		self._name = None
+		self.points = 0
 	
-	for y in scoring:
-		f = filter(y['filter'], hand)
-		if len(f) >= y['count']:
-			score += y['score'][0](len(f))
-			yaku.append(y['score'][1])
-	return (score, yaku)
+	def check(self, caps):
+		f = self._filter_attr(self.filter, caps)
+		return len(f) >= self.count
+	def score(self, caps = None):
+		return self.points
+	def name(self, caps = None): # actual name, if any
+		return self._name
+	def names(self): # all possible names
+		return [self._name]
 
+	# return caps with anything that doesn't have the attr removed
+	def _filter_attr(self, attr, caps):
+		return filter(lambda c: attr in c.attrs, caps)
+	def _in_caps(self, attr, caps):
+		return len(self._filter_attr(attr, caps)) > 0
 
-#
-#for yaku in scoring:
-#	f = filter(yaku['filter'], deck)
-#	if len(f) >= yaku['count']:
-#		score = yaku['score'][0](len(f))
-#		desc = yaku['score'][1]
-#		print(score, desc)
-#
-#print(score_brights(deck))
-#
+# {{{ caps definitions 
+all_hands = []
+def define_hand(y):
+	all_hands.append(y())
+	return y
+@define_hand
+class Redslip(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'redslip'
+		self.count = 3
+		self._name = "Red Poems" # 赤タン
+		self.points = 6
+@define_hand
+class Blueslip(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'blueslip'
+		self.count = 3
+		self._name = "Blue Poems" # 青タン
+		self.points = 6
+@define_hand
+class Slip(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'slip'
+		self.count = 5
+		self._name = "Poems" # タン
+	def score(self, caps):
+		# 1 basic + 1 for each slip after
+		f = self._filter_attrs('slip', caps)
+		return len(f) - 4
+@define_hand
+class Hanami(Yaku): # err, should be doing this in English, but 'moon viewing' is long
+	def __init__(self):
+		Yaku.__init__(self)
+		self._name = "Flower viewing" # 花見(酒)
+		self.points = 5
+	def check(self, caps):
+		return self._in_caps('cup', caps) and self._in_caps('curtain', caps)
+@define_hand
+class Tsukimi(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self._name = "Moon viewing" # 月見 (酒)
+		self.points = 5
+	def check(self, caps):
+		return self._in_caps('cup', caps) and self._in_caps('moon', caps)
+@define_hand
+class ISC(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'isc'
+		self.count = 3
+		self._name = "D.B.D" # Ino Shika Chou
+		self.points = 6
+	def score(self, caps):
+		# 6 basic + 3 for each animal afterwards
+		f = self._filter_attrs('animal', caps)
+		return len(f) + 3
+@define_hand
+class Animal(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'animal'
+		self.count = 5
+		self._name = "Earth" # タネ
+	def score(self, caps):
+		# 1 basic + 1 for each animal after
+		f = self._filter_attrs('slip', caps)
+		return len(f) - 4
+@define_hand
+class Dregs(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self._name = "Basic" # can't remember
+		self.filter = lambda c: c.rank == 1
+	def check(self, caps):
+		f = filter(self.filter, caps)
+		return len(f) >= 10
+	def score(self, caps):
+		# 1 basic + 1 for each animal after
+		f = filter(self.filter, caps)
+		return len(f) - 9
+@define_hand
+class Lights(Yaku):
+	def __init__(self):
+		Yaku.__init__(self)
+		self.filter = 'bright'
+		self.count = 3
+	def check(self, caps):
+		ret = Yaku.check(self, caps)
+		# 3 brights including rainmain is not valid
+		if ret and self._in_caps('rainmain', caps):
+			return False
+		return ret
+	def score_brights(self, caps):
+		brights = self._filter_attr('bright', caps)
+		# 5 brights
+		if len(brights) == 5:
+			return (10, "Five Lights")
+		rainmain = self._in_caps('rainmain', caps)
+		if len(brights) == 4:
+			# rainy four
+			if rainmain:
+				return (7, "Four Lights")
+			else: # dry four
+				return (8, "Dry Four Lights")
+		if not rainmain and len(brights) == 3:
+			return (6, "Three Lights")
+		return (0, "")
+	def score(self, caps):
+		(sc, _) = self.score_brights(caps)
+		return sc
+	def name(self, caps):
+		(_, name) = self.score_brights(caps)
+		return name 
+	def names(self):
+		return ["Five Lights", "Four Lights", "Dry Four Lights",
+			"Three Lights"]
+# }}}
+class Scoring:
+	def __init__(self):
+		self.hands = all_hands # generated with decorators above
+		self.total = 0
+		self.names = map(lambda x: x.names(), self.hands)
+		# yeah, this makes my head hurt too
+		self.names = [item for sublist in self.names
+				for item in sublist]
+		# Associate each hand with its name
+		self.names = dict.fromkeys(self.names, None)
+	def update(self, caps):
+		score = 0
+		new = False
+		for y in self.hands:
+			if y.check(caps):
+				score += y.score(caps)
+				n = y.name(caps)
+				if not self.names[n]:
+					new = True
+				self.names[y.name] = True
+		self.total = score
+		return new
+

@@ -2,35 +2,67 @@
 // the list of matchable cards
 //jquery should be loaded
 
-var cardMatch = new Array(100); // safe value... stupid, but meh
+
 var dragging = false;
-
-function updateMatch(hand, field) {
-	cardMatch[hand] = field;
-	return;
-}
-
-function getMatch(hand) {
-	return cardMatch[hand];
-}
-
-function markMatched(hand) {
-	var matched = cardMatch[hand];
-	var i;
-	for (i = 0; i < matched.length;i++) {
-		var el = $("#field_" + matched[i]);
-		//el.effect("pulsate", {times:1}, 2000);
-		el.addClass("cardHighlight");
-	}
-	return;
-}
-function unmark() {
-	if (!dragging)
-		$(".fieldCard").removeClass("cardHighlight");
-}
 
 function log(msg) {
 	window.opera.postError(msg);
+}
+
+function clear_suit(el) {
+	var i;
+	for (i=0;i < 12;i++) {
+		el.removeClass("mon" + i);
+	}
+}
+
+function update(json) {
+	var i;
+	if (json.field) {
+		for (i = 0;i < json.field.length;i++) {
+			var el = json.field[i];
+			var cn = "#field_" + el.id;
+			var card = $(cn);
+			card.attr('src', el.img);
+			clear_suit(card);
+			card.addClass(el.suit);
+			card.data('suit', el.suit);
+		}
+		//update the field
+	}
+	if (json.hand) {
+		//update player's hand
+		//this is only going to be removing stuff
+		for (i = 0;i < json.hand.length;i++) {
+			var idx = json.hand[i];
+			var cn = "#player_" + idx;
+			$(cn).css('display', 'none');
+		}
+	}
+	if (json.caps_self) {
+		//update own captures
+		for (i = 0;i < json.caps_self.length;i++) {
+			//create a new element and stick it in
+			//may need to add IDs to these to make them sort... or
+			//maybe not, just have groups for them
+			var img = "<img src=\"" + json.caps_self[i].img + "\" />";
+			$("#playerCaptures img:last-child").after(img);
+		}
+	}
+	if (json.caps_opp) {
+		//update opponent's captures
+	}
+	if (json.opp) {
+		//update opponent's hand
+	}
+}
+
+function comet() {
+	$.getJSON('update', function(json) {
+			update(json)
+			setTimeout("comet()", 500);
+		});
+	return;
 }
 
 function init() {
@@ -39,38 +71,59 @@ function init() {
 			//hand
 			for (i = 0;i < 8;i++) {
 				var cn = "#player_" + i;
-				$(cn).get(0).src = json.hand[i];
+				$(cn).get(0).src = json.hand[i].img;
+				$(cn).addClass(json.hand[i].suit)
+				$(cn).data('suit', json.hand[i].suit)
+				$(cn).data('id', i);
 			}
-			//card matches
-			for (i = 0;i < 8;i++) {
-				updateMatch(i, json.matches[i]);
-			}
+
 			//field
 			for (i = 0;i < 8;i++) {
 				if (json.field[i] == "blank") {
 					// need to blank it somehow...
 				}
 				var cn = "#field_" + i;
-				$(cn).get(0).src = json.field[i];
+				$(cn).get(0).src = json.field[i].img;
+				$(cn).addClass(json.field[i].suit);
+				$(cn).data('suit', json.field[i].suit);
+				$(cn).data('id', i);
 			}
+			$(".fieldCard").droppable({drop: function(event, ui) {
+					place(ui.draggable.data("id"), $(this).data("id"));
+					}});
+
+
 			//dealer?
 	});
 
-	//set up the dragging functionality
-	//need to make the original disappear somehow...
+	
+	/* handle dragging and hovering cards
+	 * On hover highlight the cards that match the highlighted card
+	 * On drag lock the highlight
+	 * On drag release or unhover remove the highlight
+	 */
 	$("#playerHand > .handCard").draggable({helper: 'clone',
 			start: function(event, ui) {
 				dragging = true; //need to mark the original somehow
 				},
-			stop: function() {dragging = false;unmark();}});
+			stop: function() {dragging = false;unmark_field();}});
 	$("#playerHand > .handCard").hover(function() {
-			//substr 7: is the start of the number after field_
-			id = $(this).get(0).id.substr(7, 3);
-			markMatched(id);
+			//start hover handler, mark the suit
+			var suit = $(this).data('suit');
+			mark_field(suit);
 			}, function() {
-			unmark();
+			//stop hover handler
+			unmark_field();
 			});
 
+}
+
+function mark_field(month) {
+	$(".fieldCard." + month).addClass('cardHighlight');
+}
+function unmark_field() {
+	if (!dragging)
+		$(".fieldcard.cardHighlight").removeClass('cardHighlight');
 }
 
 /* User took one of their cards and placed it, either on a matched card on an
@@ -78,8 +131,10 @@ function init() {
  * handID: ID of the card taken
  * fieldID: ID of the card matched (-1 for empty)
  */
-function select(handID, fieldID) {
-	$.getJSON('ajax/place', {hand: handID, field: fieldID}, function(json) {
+function place(handID, fieldID) {
+	$.getJSON('place', {hand: handID, field: fieldID}, function(json) {
+			update(json);
+			//catch the usual update stuff
 			//captures
 			//field
 			//deck

@@ -4,16 +4,17 @@ import random
 class Game:
 	FIELD_SIZE = 10
 	# Dealer should be 0 or 1
-	def __init__(self, cards, dealer = -1):
+	def __init__(self, deck, dealer = -1):
 		# "the total number of permutations of x is larger than the
 		# period of most random number generators; this implies that
 		# most permutations of a long sequence can never be generated."
 		# but I don't think there's much to do about it
-		random.shuffle(cards)
-		self.cards = cards
+		random.shuffle(deck)
+		self.cards = deck
 		# take the first 3 slices of 8 cards to make the hands and field
 		self.hands = (self.cards[0:8], self.cards[8:16])
 		self.captures = ([], [])
+		self.scores = (cards.Scoring(), cards.Scoring())
 		self.field = self.cards[16:24]
 		# Pad up to FIELD_SIZE with Nones
 		self.field.extend([None] * (self.FIELD_SIZE - len(self.field)))
@@ -29,13 +30,13 @@ class Game:
 		
 		self.multiplier = 1
 
-	def player(self):
+	def get_player(self):
 		return self.player
 	
-	def hand(self, player):
+	def get_hand(self, player):
 		return self.hands[player]
 
-	def captures(self, player):
+	def get_captures(self, player):
 		return self.captures[player]
 
 	def get_field(self):
@@ -61,12 +62,14 @@ class Game:
 			return -1 # exception, trying to match the deck suit to
 					# something random
 
-		# No error, so flip the player now
 
 		# prepare the return stuff
-		caps = []
-		ret_field = []
-		deck = None
+		# caps is going to be weird
+		changes = {'caps': [], 'field': [], 'hand': [], 'deck': False,
+			'koikoi': False}
+		#caps = []
+		#ret_field = []
+		#deck = None
 
 		# Match the existing card
 		if field == -1:
@@ -75,17 +78,22 @@ class Game:
 			idx = self.field.index(None)
 			# that will bug out if the field ever fills...
 			self.field[idx] = self.hands[player][hand]
-			ret_field.append(self.hands[player][hand])
+			changes['field'].append(idx)
 			self.hands[player][hand] = None
+			changes['hand'].append(hand)
 		else:
 			# Actually matching something
 			self.captures[player].extend([self.field[field], self.hands[player][hand]])
-			caps.extend([self.field[field], self.hands[player][hand]])
+			changes['caps'].extend([self.field[field], self.hands[player][hand]])
 			self.field[field] = None
+			changes['field'].append(field)
 			self.hands[player][hand] = None
+			changes['hand'].append(hand)
 			if hand == -1: # Special case, matching from the deck to
 				# the field. Don't need to draw
-				return {'captures': caps, 'deck': None}
+				# But still do need to change player
+				self.player = 1 if self.player == 0 else 0
+				return changes
 
 		# Draw a card, etc.
 		card = self.cards.pop()
@@ -94,26 +102,41 @@ class Game:
 			# Nothing matches, put it into the field
 			idx = self.field.index(None)
 			self.field[idx] = card
-			ret_field.append(card)
+			changes['field'].append(idx)
 		elif len(matches) == 1:
 			# Only one match, take both cards
 			match = matches[0]
 			self.captures[player].extend([self.field[match], card])
-			caps.extend([self.field[match], card])
+			changes['caps'].extend([self.field[match], card])
 			self.field[match] = None
+			changes['field'].append(match)
+		elif len(matches) == 3: # Special rule, 3 matches -> take them all
+			# If not for this the other 2 cards would be stuck on the field
+			cap_cards = map(lambda x: self.field[x], matches)
+			self.captures[player].extend(cap_cards)
+			changes['caps'].extend(cap_cards)
+			for x in matches:
+				self.field[x] = None
+				changes['field'].append(x)
 		else:
 			# More than one match, need the player to choose
 			self.deck_top = card
-			deck = card
+			changes['deck'] = True
 		# if deck is set the player needs to force a match, turn isn't
 		# over
 		# TODO: This will also need to check for fresh yakus
-		if not deck:
+		newyaku = self.scores[player].update(self.captures[player])
+		changes['koikoi'] = newyaku
+		if not changes['deck'] and not newyaku:
 			self.player = 1 if self.player == 0 else 0
-		return {'captures': caps, 'field': ret_field, 'deck': deck}
+		return changes
+
+	def koikoi(self):
+		self.multiplier *= 2
+		self.player = 1 if self.player == 0 else 0
 	
 	def score(self, player):
-		return cards.score_hand(self.captures[player])
+		return self.scores[player]
 		
 	def _search_field(self, suit):
 		res = []
