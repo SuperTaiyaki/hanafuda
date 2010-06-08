@@ -105,6 +105,8 @@ class Server:
 			if g.get_player() == player:
 				ret['active'] = True
 
+			ret['gameid'] = cherrypy.session['game']
+
 			return json.dumps(ret)
 
 	def update_card(self, idx, card):
@@ -141,7 +143,7 @@ class Server:
 			ret['hand'] = []
 			for c in upd['hand']:
 				ret['hand'].append(c)
-				upd['opp_hand'] = ret['hand']
+				oupd['opp_hand'] = ret['hand']
 		if len(upd['caps']) > 0:
 			ret['caps_self'] = []
 			for c in upd['caps']:
@@ -149,7 +151,7 @@ class Server:
 			oupd['caps_opp'] = ret['caps_self']
 		if upd['deck']:
 			ret['deck'] = self.update_card(0, g.get_deck_top())
-			uopd['deck'] = ret['deck']
+			oupd['deck'] = ret['deck']
 			# Need to set up highlighting and other junk too
 
 
@@ -157,6 +159,8 @@ class Server:
 			oupd['active'] = True
 		else:
 			ret['active'] = True
+
+		ret['gameid'] = oupd['gameid'] = cherrypy.session['game']
 
 		# Trigger the update for the other player
 		self.set_update(oupd)

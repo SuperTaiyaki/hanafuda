@@ -4,6 +4,8 @@
 
 
 var dragging = false;
+var cometactive = false;
+var gameid;
 
 function log(msg) {
 	window.opera.postError(msg);
@@ -22,6 +24,9 @@ function update(json) {
 		return;
 	}
 	var i;
+	if (json.gameid != gameid) {
+		alert("Game IDs don't match: own " + gameid + " new " + json.gameid);
+	}
 	if (json.field) {
 		for (i = 0;i < json.field.length;i++) {
 			var el = json.field[i];
@@ -60,8 +65,9 @@ function update(json) {
 			$("#opponentCaptures img:last-child").after(img);
 		}
 	}
-	if (json.opp) {
+	if (json.opp_hand) {
 		//update opponent's hand
+		$("#opponent_" + json.opp_hand[0]).css('display', 'none');
 	}
 
 	if (json.deck) {
@@ -83,7 +89,9 @@ function update(json) {
 }
 
 function comet() {
+	cometactive = true;
 	$.getJSON('update', function(json) {
+			cometactive = false;
 			update(json);
 		});
 	return;
@@ -92,6 +100,7 @@ function comet() {
 function init() {
 	$.getJSON('ajax/init', function(json) {
 			var i;
+			gameid = json.gameid;
 			//hand
 			for (i = 0;i < 8;i++) {
 
@@ -163,15 +172,13 @@ function unmark_field() {
  * fieldID: ID of the card matched (-1 for empty)
  */
 function place(handID, fieldID) {
+	if (cometactive) {
+		alert("Error, it's probably not your turn");
+		return;
+	}
 	$.getJSON('place', {hand: handID, field: fieldID}, function(json) {
 			update(json);
-			//catch the usual update stuff
-			//captures
-			//field
-			//deck
-			//userselect?
 
-			//koikoi?
 	});
 	return;
 }
@@ -189,6 +196,10 @@ function deckMatch(matches) {
  * backend
  */
 function deckMatchSelect(fieldID) {
+	if (cometactive) {
+		alert("Error, it's probably not your turn");
+		return;
+	}
 	$.getJSON('ajax/fieldselect', {field: fieldID}, function(json) {
 			//koikoi?
 
@@ -219,5 +230,4 @@ function endGame() {
 $(document).ready(function() {
 		init();
 		});
-
 
