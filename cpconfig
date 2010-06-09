@@ -1,6 +1,7 @@
 [global]
 tools.sessions.on = True
 tools.staticdir.root = '/home/rek/code/hanafuda'
+# server.socket_host: "192.168.0.128"
 [/]
 
 [/img]

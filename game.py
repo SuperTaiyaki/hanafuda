@@ -68,11 +68,14 @@ class Game:
 
 		# prepare the return stuff
 		# caps is going to be weird
-		changes = {'caps': [], 'field': [], 'hand': [], 'deck': False,
-			'koikoi': False}
-		#caps = []
-		#ret_field = []
-		#deck = None
+		changes = {'caps': [], 'field': [], 'hand': [],
+				'deck': False, 'koikoi': False}
+		# List of the sources for various cards
+		# [0] is hand
+		# [1] is field (matched to hand) (1 or 3)
+		# deck is implied
+		# [2] is field (matched to deck)
+		changes['sources'] = [[hand], [], []]
 
 		# Match the existing card
 		if self.field[field] == None:
@@ -90,6 +93,7 @@ class Game:
 				cap_cards.append(self.hands[player][hand])
 				self.captures[player].extend(cap_cards)
 				changes['caps'].extend(cap_cards)
+				changes['sources'][1] = matches
 				for x in matches:
 					self.field[x] = None
 					changes['field'].append(x)
@@ -98,6 +102,7 @@ class Game:
 				changes['caps'].extend([self.field[field], self.hands[player][hand]])
 				self.field[field] = None
 				changes['field'].append(field)
+				changes['sources'][1] = [field]
 
 			self.hands[player][hand] = None
 			changes['hand'].append(hand)
@@ -122,11 +127,13 @@ class Game:
 			changes['caps'].extend([self.field[match], card])
 			self.field[match] = None
 			changes['field'].append(match)
+			changes['sources'][2] = match
 		elif len(matches) == 3: # Special rule, 3 matches -> take them all
 			# If not for this the other 2 cards would be stuck on the field
 			cap_cards = map(lambda x: self.field[x], matches)
 			self.captures[player].extend(cap_cards)
 			changes['caps'].extend(cap_cards)
+			changes['sources'][2] = matches
 			for x in matches:
 				self.field[x] = None
 				changes['field'].append(x)
@@ -140,9 +147,11 @@ class Game:
 		newyaku = self.scores[player].update(self.captures[player])
 		changes['koikoi'] = newyaku
 
-#		if len(self.hands[player]) == 0 and self.player != self.dealer:
-			# Ran out of cards, the game is over
-
+		if len(self.hands[player]) == 0 and self.player != self.dealer:
+			if newyaku:
+				self.winner = player
+			else:
+				self.winner = 3; # nobody
 
 		if not changes['deck'] and not newyaku:
 			self.player = 1 if self.player == 0 else 0

@@ -150,8 +150,9 @@ class Server:
 		# Player update will be hand, field, maybe deck, captures
 		# Opponent update will be opponent, field, opponent captures
 
-		ret = {} # local update
-		oupd = {} # other player's update
+		inputs = {'hand': hand, 'field': field}
+		ret = {'inputs': inputs} # local update
+		oupd = {'inputs': inputs} # other player's update
 		if len(upd['field']) > 0:
 			ret['field'] = []
 			for c in upd['field']:
@@ -160,14 +161,16 @@ class Server:
 			oupd['field'] = ret['field']
 		if len(upd['hand']) > 0:
 			ret['hand'] = []
+			# it's an array, but there's really only one
 			for c in upd['hand']:
 				ret['hand'].append(c)
-				oupd['opp_hand'] = ret['hand']
+				oupd['opp_hand'] = update_card(hand, c)
 		if len(upd['caps']) > 0:
 			ret['caps_self'] = []
 			for c in upd['caps']:
 				ret['caps_self'].append(self.update_card(0, c))
 			oupd['caps_opp'] = ret['caps_self']
+			ret['sources'] = oupd['sources'] = upd['sources']
 		if upd['deck']:
 			ret['deck'] = self.update_card(0, g.get_deck_top())
 			oupd['deck'] = ret['deck']
