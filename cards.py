@@ -193,13 +193,12 @@ class Lights(Yaku):
 	def __init__(self):
 		Yaku.__init__(self)
 		self.filter = 'bright'
-		self.count = 3
 	def check(self, caps):
-		ret = Yaku.check(self, caps)
+		f = self._filter_attr(self.filter, caps)
 		# 3 brights including rainmain is not valid
-		if ret and self._in_caps('rainmain', caps):
+		if len(f) == 3 and self._in_caps('rainmain', caps):
 			return False
-		return ret
+		return len(f) >= 3
 	def score_brights(self, caps):
 		brights = self._filter_attr('bright', caps)
 		# 5 brights

@@ -68,6 +68,7 @@ class Game:
 		if player != self.player:
 			raise GameError("Wrong player's turn")
 		if hand != -1 and self.hands[player][hand] == None:
+			print ("Error Hand: ", self.hands[player][hand])
 			raise GameError("Invalid card")
 		if hand != -1 and self.field[field] != None and self.field[field].suit != self.hands[player][hand].suit:
 			print self.field[field]
@@ -99,7 +100,8 @@ class Game:
 		else:
 			# Actually matching something
 			# Check for 3 matching cards
-			matches = self._search_field(self.hands[player][hand].suit)
+			matches = (self._search_field(self.hands[player][hand].suit) if
+					hand != -1 else [])
 			if (len(matches) == 3):
 				cap_cards = map(lambda x: self.field[x], matches)
 				cap_cards.append(self.hands[player][hand])
@@ -155,13 +157,14 @@ class Game:
 		newyaku = self.scores[player].update(self.captures[player])
 		changes['koikoi'] = newyaku
 
-		if len(self.hands[player]) == 0 and self.player != self.dealer:
+#		if len(self.hands[player]) == 0 and self.player != self.dealer:
 			# Ran out of cards, the game is over
 
 
 		if not changes['deck'] and not newyaku:
 			self.player = 1 if self.player == 0 else 0
 		return changes
+
 
 	def koikoi(self):
 		self.multiplier *= 2

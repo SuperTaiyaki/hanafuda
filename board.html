@@ -15,11 +15,32 @@
 				position: absolute;
 				left: 40%;
 				top: 40%;
+				z-index: 20;
 			}
+			div#results {
+				padding-left: 100px; padding-right:
+				100px; padding-top: 100px; padding-bottom:
+				100px;
+				position: absolute;
+				background-color: #CCC;
+				left: 40%;
+				top: 40%;
+				display: none;
+				z-index: 20;
+				border: 3px solid black;
+			}
+
 			div#fieldCards {padding-top:50px;padding-bottom:50px;
 				clear:left;float:left}
 			div#dataBox {float:left; padding-top:90px}
 			div#playerHand {clear:left}
+			div#screen {position:absolute;
+				width:100%;
+				height:100%;
+				background-color: #999;
+				display: none;
+				z-index: 10;
+				opacity: 0.5;}
 			div.capdiv {padding:5px}
 			div.hand {clear:left; float:left; padding: 10px;
 				border: 1px solid black}
@@ -108,6 +129,11 @@
 		<p><span onclick="koikoi()">Koi</span>
 		<span onclick="endGame()">Game</span></p>
 		<p>Hands: <span id="txtHands"></span></p>
+	</div>
+
+	<div id="results" class="results">
+	</div>
+	<div id="screen">
 	</div>
 
 </body>

@@ -1,5 +1,7 @@
 import cherrypy
 from mako.template import Template
+from mako.runtime import Context
+from StringIO import StringIO
 import game
 import cards
 import json
@@ -112,12 +114,17 @@ class Server:
 		elif arg == "koikoi":
 			g.koikoi()
 			# Trip a mostly empty update to make the turns switch
+			# Should also show the opponent what happened
 			self.set_update({'active': True})
 			return json.dumps({})
 		elif arg == "endgame":
 			g.end(player)
 			# Save the results and delete the game to save memory
-			# Trigger the redirect somehow
+			ret = {'results': self.score(g, player)}
+			p2 = 1 if player == 0 else 0
+			oupd = {'results': self.score(g, p2)}
+			self.set_update(oupd)
+			return json.dumps(ret)
 
 
 	def update_card(self, idx, card):
@@ -170,7 +177,9 @@ class Server:
 			ret['yaku'] = scores.get_names()
 			ret['score'] = scores.get_score()
 			oupd['opp_score'] = ret['score']
-			
+		if hand == -1:
+			uopd['deck_clear'] = True
+
 
 		if g.get_player() != player:
 			oupd['active'] = True
@@ -179,11 +188,29 @@ class Server:
 
 		ret['gameid'] = oupd['gameid'] = cherrypy.session['game']
 
+		# If the game is over also bring up the results page
+		if g.winner != None:
+			ret['results'] = self.score(g, player)
+			p2 = 0 if player == 1 else 1
+			oupd['results'] = self.score(g, p2)
+
 		# Trigger the update for the other player
 		self.set_update(oupd)
 
 		return json.dumps(ret)
 
+	@cherrypy.expose # testing only
+	def score(self, g, player):
+		tmpl = Template(filename="results.html")
+		ctx = {}
+		ctx['result'] = "Win" if g.winner == player else "Lose"
+		scores = g.get_score(g.winner)
+		ctx['score'] = scores.get_score()
+		ctx['multiplier'] = g.multiplier
+		ctx['finalScore'] = g.multiplier * ctx['score']
+		ctx['hands'] = scores.get_names()
+		print ctx
+		return tmpl.render(c = ctx)
 
 	@cherrypy.expose
 	def update(self):
@@ -197,6 +224,18 @@ class Server:
 		(g, player) = self.getsession()
 		tmpl = Template(filename="board.html")
 		return tmpl.render()
+
+
+	@cherrypy.expose
+	def debug(self, args):
+		(g, player) = self.getsession()
+		if args == "win":
+			g.winner = player
+		elif args == "koikoi":
+			c = cards.Card("jan1.gif", 1)
+			c.attrs['bright'] = True
+			g.captures[player].extend([c] * 5)
+
 
 	# Summary screen after the game is over
 	@cherrypy.expose

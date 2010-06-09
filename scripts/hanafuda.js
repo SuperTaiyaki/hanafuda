@@ -26,18 +26,27 @@ function deckselect_enable(card) {
 	var month = card.suit
 	mark_field(month);
 	//should disable highlight and dragging for the main cards
-	$(".fieldCard:not(." + month + ")").droppable("option", "disabled", "true");
-	$(".handCard").draggable("option", "disabled", "true");
+	$(".fieldCard:not(." + month + ")").droppable("option", "disabled", true);
+	$(".handCard").draggable("option", "disabled", true);
 	deck_select = true;
 }
 
 function deckselect_disable(card) {
 	//restore the old state
 	$("#deckCard").attr('src', "img/back.gif");
-	$(".fieldCard").droppable("option", "disabled", "false");
-	$(".handCard").draggable("option", "disabled", "false");
+	$(".fieldCard").droppable("option", "disabled", false);
+	$(".handCard").draggable("option", "disabled", false);
 	deck_select = false;
 	unmark_field();
+}
+
+// Hide the playable area slightly
+function screen_on() {
+	$("#screen").css('display', 'block');
+}
+
+function screen_off() {
+	$("#screen").css('display', 'none');
 }
 
 function addCaptures(caps, path) {
@@ -118,6 +127,9 @@ function update(json) {
 			deckselect_enable(json.deck);
 		}
 	}
+	if (json.deck_clear) {
+		$("#deckCard").attr('src', "img/back.gif");
+	}
 
 	if (json.koikoi) {
 		var yakus = ""
@@ -126,18 +138,28 @@ function update(json) {
 		}
 		$("#txtHands").html(yakus);
 		$("#koikoiPrompt").css('display', 'block');
+		screen_on();
 	}
 
 	if (json.score) {
 		$("#txtScore").text(json.score);
 	}else if (json.opp_score) {
-		alert("Opponent's score: " + json.opp_score);
 		$("#txtOppScore").text(json.opp_score);
 	}
 	
 	//need to handle other stuff like koikoi prompt and card selection
 	//
 	
+	//score prompt
+	if (json.results) {
+		$("#results").html(json.results);
+		$("#results").css('display', 'block');
+		$("#results").draggable(); //if the user wants to see the field
+		screen_on();
+		return; //don't let the comet restart
+	}
+
+
 	if (!json.active) {
 		$("#playerHand").addClass("handDisabled");
 		setTimeout("comet()", 500);
@@ -270,12 +292,14 @@ function koikoi() {
 			update(json);
 			//processYaku(json);
 	});
+	screen_off();
 	$("#koikoiPrompt").css('display', 'none');
 }
 
 function endGame() {
 	$.getJSON('ajax/endgame', function(json) {
-			//dunno
+			$("#koikoiPrompt").css('display', 'none');
+			update(json);
 	});
 	
 }
