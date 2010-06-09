@@ -13,6 +13,7 @@ function log(msg) {
 	window.opera.postError(msg);
 }
 
+// Strip all suits off a card
 function clear_suit(el) {
 	var i;
 	for (i=0;i < 12;i++) {
@@ -20,11 +21,15 @@ function clear_suit(el) {
 	}
 }
 
+/* enter deck selection mode, where there are multiple options from the field to
+ * match a card from the deck. The player can only take the deck card and match
+ * it to field cards of the same suit.
+ */
 function deckselect_enable(card) {
 	$("#deckCard").draggable({helper: 'clone'});
 	unmark_field();
 	var month = card.suit
-	mark_field(month);
+	mark_field(month, false);
 	//should disable highlight and dragging for the main cards
 	$(".fieldCard:not(." + month + ")").droppable("option", "disabled", true);
 	$(".handCard").draggable("option", "disabled", true);
@@ -40,7 +45,8 @@ function deckselect_disable(card) {
 	unmark_field();
 }
 
-// Hide the playable area slightly
+/* Raise a screen onto the playing area to block interaction. Used for dialogs.
+ */
 function screen_on() {
 	$("#screen").css('display', 'block');
 }
@@ -49,6 +55,9 @@ function screen_off() {
 	$("#screen").css('display', 'none');
 }
 
+/* Take a list of captures and insert it into the captures box given. The main
+ * work of this is to group them correctly.
+ */
 function addCaptures(caps, path) {
 	var i;
 	for (i = 0;i < caps.length;i++) {
@@ -63,12 +72,53 @@ function addCaptures(caps, path) {
 			case 5:
 				group = "Slips";
 		}
-		var img = "<img src=\"" + caps[i].img + "\" />";
+		var img = "<img src=\"" + caps[i].img + "\" class=\"capCard\" />";
 		var target = path.children(".captures" + group).children().last();
 		target.after(img);
 	}
 }
 
+
+function updateField(cards) {
+	for (i = 0;i < cards.length;i++) {
+		var el = cards[i];
+		var cn = "#field_" + el.id;
+		var card = $(cn);
+		card.attr('src', el.img);
+		clear_suit(card);
+		card.addClass(el.suit);
+		card.data('suit', el.suit);
+	}
+}
+
+function enable_hand() {
+	$("#playerHand").removeClass("handDisabled");
+	$("#opponentHand").addClass("handDisabled");
+	$("#playerHand > .handCard").draggable("option", "disabled", false);
+}
+
+function disable_hand() {
+	$("#opponentHand").removeClass("handDisabled")
+	$("#playerHand").addClass("handDisabled");
+	$("#playerHand > .handCard").draggable("option", "disabled", true);
+}
+
+function drag_targets(suit, blank) {
+	if (deck_select)
+		return; //don't bother it
+	$(".fieldCard").droppable("option", "disabled", true);
+	if (suit == "")
+		return;
+	var droptgts = $(".fieldcard." + suit);
+	if (droptgts.length > 0)
+		droptgts.droppable("option", "disabled", false);
+	else
+		$(".fieldCard.empty").droppable("option", "disabled", false);
+}
+
+/* General update worker function, take an update from the backend and process
+ * the fields.
+ */
 function update(json) {
 	if (json.error) {
 		alert(json.error);
@@ -79,44 +129,27 @@ function update(json) {
 		alert("Game IDs don't match: own " + gameid + " new " + json.gameid);
 	}*/
 	if (json.field) {
-		for (i = 0;i < json.field.length;i++) {
-			var el = json.field[i];
-			var cn = "#field_" + el.id;
-			var card = $(cn);
-			card.attr('src', el.img);
-			clear_suit(card);
-			card.addClass(el.suit);
-			card.data('suit', el.suit);
-		}
-		//update the field
+		updateField(json.field)
 	}
 	if (json.hand) {
-		//update player's hand
-		//this is only going to be removing stuff
+		// hide cards from the player's own hand
 		for (i = 0;i < json.hand.length;i++) {
 			var idx = json.hand[i];
 			var cn = "#player_" + idx;
 			$(cn).css('display', 'none');
 		}
 	}
+	if (json.opp_hand) {
+		//update opponent's hand
+		$("#opponent_" + json.opp_hand[0]).css('display', 'none');
+	}
 	if (json.caps_self) {
 		//update own captures
 		addCaptures(json.caps_self, $("#playerCaptures"));
-/*		for (i = 0;i < json.caps_self.length;i++) {
-			//create a new element and stick it in
-			//may need to add IDs to these to make them sort... or
-			//maybe not, just have groups for them
-			var img = "<img src=\"" + json.caps_self[i].img + "\" />";
-			$("#playerCaptures img:last-child").after(img);
-		}*/
 	}
 	if (json.caps_opp) {
 		//update opponent's captures
 		addCaptures(json.caps_opp, $("#opponentCaptures"));
-	}
-	if (json.opp_hand) {
-		//update opponent's hand
-		$("#opponent_" + json.opp_hand[0]).css('display', 'none');
 	}
 
 	if (json.deck) {
@@ -143,33 +176,30 @@ function update(json) {
 
 	if (json.score) {
 		$("#txtScore").text(json.score);
-	}else if (json.opp_score) {
+	} else if (json.opp_score) {
 		$("#txtOppScore").text(json.opp_score);
 	}
 	
-	//need to handle other stuff like koikoi prompt and card selection
-	//
-	
-	//score prompt
+	//Results display
 	if (json.results) {
 		$("#results").html(json.results);
 		$("#results").css('display', 'block');
-		$("#results").draggable(); //if the user wants to see the field
+		$("#results").draggable(); //if the user wants to see stuff
 		screen_on();
 		return; //don't let the comet restart
 	}
 
 
 	if (!json.active) {
-		$("#playerHand").addClass("handDisabled");
+		disable_hand();
 		setTimeout("comet()", 500);
 	} else {
-		$("#playerHand").removeClass("handDisabled");
+		enable_hand();
 	}
 }
 
 function comet() {
-	cometactive = true;
+	cometactive = true; //because it will block other ajax requests
 	$.getJSON('update', function(json) {
 			cometactive = false;
 			update(json);
@@ -184,7 +214,6 @@ function init() {
 			$("#txtGameId").html(gameid); */
 			//hand
 			for (i = 0;i < 8;i++) {
-
 				var cn = "#player_" + i;
 				if (json.hand[i].suit == -1) {
 					$(cn).css('display', 'none');
@@ -197,30 +226,24 @@ function init() {
 			}
 
 			//field
-			for (i = 0;i < 8;i++) {
-
+			for (i = 0;i < 12;i++) {
 				var cn = "#field_" + i;
 				$(cn).get(0).src = json.field[i].img;
 				$(cn).addClass(json.field[i].suit);
 				$(cn).data('suit', json.field[i].suit);
 				$(cn).data('id', i);
 			}
-			//the other 4 are blank but droppable
-			for (i = 8;i < 12;i++) {
-				var cn = "#field_" + i;
-				$(cn).data('id', i);
-			}
 
-			$("#deckCard").data('id', -1); // set this up now
+			$("#deckCard").data('id', -1);
 
 			$(".fieldCard").droppable({drop: function(event, ui) {
 					place(ui.draggable.data("id"), $(this).data("id"));
-					}});
-
+					},
+					'disabled': true});
 
 			//dealer?
 			if (!json.active) {
-				$("#playerHand").addClass("handDisabled");
+				disable_hand();
 				setTimeout('comet()', 500); //start the comet process going
 			}
 	});
@@ -234,12 +257,20 @@ function init() {
 	$("#playerHand > .handCard").draggable({helper: 'clone',
 			start: function(event, ui) {
 				dragging = true; //need to mark the original somehow
+				$(this).css('opacity', 0.2);
+				draggingthing = $(this);
+				var month = $(this).data('suit');
+				drag_targets(month, true);
 				},
-			stop: function() {dragging = false;unmark_field();}});
+			stop: function() {
+				dragging = false;
+				unmark_field();
+				draggingthing.css('opacity', 1.0);
+				}});
 	$("#playerHand > .handCard").hover(function() {
 			//start hover handler, mark the suit
 			var suit = $(this).data('suit');
-			mark_field(suit);
+			mark_field(suit, true);
 			}, function() {
 			//stop hover handler
 			unmark_field();
@@ -247,12 +278,18 @@ function init() {
 
 }
 
-function mark_field(month) {
-	$(".fieldCard." + month).addClass('cardHighlight');
+function mark_field(month, blank) {
+	var tgts = $(".fieldCard." + month);
+	if (tgts.length > 0)
+		tgts.addClass('cardHighlight');
+	else if (blank)
+		$(".fieldcard.empty").addClass('cardHighlight');
 }
 function unmark_field() {
-	if (!dragging && !deck_select)
+	if (!dragging && !deck_select) {
 		$(".fieldcard.cardHighlight").removeClass('cardHighlight');
+		drag_targets("", false);
+	}
 }
 
 /* User took one of their cards and placed it, either on a matched card on an

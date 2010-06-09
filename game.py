@@ -8,10 +8,7 @@ class Game:
 	FIELD_SIZE = 12 # maximum possible
 	# Dealer should be 0 or 1
 	def __init__(self, deck, dealer = -1):
-		# "the total number of permutations of x is larger than the
-		# period of most random number generators; this implies that
-		# most permutations of a long sequence can never be generated."
-		# but I don't think there's much to do about it
+		# Actually not an ideal shuffle according to the docs
 		random.shuffle(deck)
 		self.cards = deck
 		# take the first 3 slices of 8 cards to make the hands and field
@@ -52,27 +49,13 @@ class Game:
 	def end(self, player):
 		self.winner = player
 
-	def hand_match(self, player):
-		# For each item in the hand make a list of matching items in the
-		# field
-		ret = [None] * self.FIELD_SIZE
-		for i, el in enumerate(self.hands[player]):
-			if el:
-				ret[i] = self._search_field(el.suit)
-			else:
-				ret[i] = None
-		return ret
-
 	def play(self, player, hand, field):
-		print("Player: ", player, " Hand: ", hand, " Field: ", field)
 		if player != self.player:
 			raise GameError("Wrong player's turn")
 		if hand != -1 and self.hands[player][hand] == None:
 			print ("Error Hand: ", self.hands[player][hand])
 			raise GameError("Invalid card")
 		if hand != -1 and self.field[field] != None and self.field[field].suit != self.hands[player][hand].suit:
-			print self.field[field]
-			print self.hands[player][hand]
 			raise GameError("Suits don't match")
 		if hand == -1 and self.deck_top.suit != self.field[field].suit:
 			raise GameError("Deck card must match field card")
@@ -165,7 +148,6 @@ class Game:
 			self.player = 1 if self.player == 0 else 0
 		return changes
 
-
 	def koikoi(self):
 		self.multiplier *= 2
 		self.player = 1 if self.player == 0 else 0
@@ -173,6 +155,7 @@ class Game:
 	def get_score(self, player):
 		return self.scores[player]
 		
+
 	def _search_field(self, suit):
 		res = []
 		for idx, val in enumerate(self.field):

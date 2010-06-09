@@ -6,6 +6,7 @@ import game
 import cards
 import json
 import threading
+import time
 
 class Server:
 
@@ -131,7 +132,7 @@ class Server:
 		ret = {'id': idx}
 		if (card == None):
 			ret['img'] = "img/empty.gif"
-			ret['suit'] = -1
+			ret['suit'] = "empty"
 		else:
 			ret['img'] = "img/" + card.image
 			ret['suit'] = "mon" + str(card.suit)

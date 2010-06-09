@@ -34,7 +34,7 @@
 				clear:left;float:left}
 			div#dataBox {float:left; padding-top:90px}
 			div#playerHand {clear:left}
-			div#screen {position:absolute;
+			div#screen {position:fixed;
 				width:100%;
 				height:100%;
 				background-color: #999;
@@ -42,14 +42,16 @@
 				z-index: 10;
 				opacity: 0.5;}
 			div.capdiv {padding:5px}
+			/* 620px calculated from a full hand */
 			div.hand {clear:left; float:left; padding: 10px;
-				border: 1px solid black}
+				border: 1px solid black; width: 620px}
 			div.captures {float:left; margin: 10px}
 
 
 			img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
 			img.fieldCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
-			.cardHighlight {background-color: #000 !important}
+			img.capCard {margin-right: -20px}
+			.cardHighlight {background-color: #807575 !important}
 			.handDisabled {background-color: #888}
 			.card {background-color: #DDD}
 			.dragging {opacity:0.5}
@@ -99,8 +101,7 @@
 	</div>
 
 	<div id="dataBox" class="databox">
-		Game id: <span id="txtGameId"></span><br />
-		Multiplier: <span id="txtMultiplier"></span><br />
+		Multiplier: <span id="txtMultiplier">1</span>x<br />
 		Score: <span id="txtScore">0</span><br />
 		Opponent's score: <span id="txtOppScore">0</span><br />
 	</div>

@@ -263,7 +263,7 @@ class Scoring:
 		return ret
 
 # {{{ Tests
-
+import copy
 class TestScoring(unittest.TestCase):
 	def setUp(self):
 		self.deck = create_deck()
@@ -280,7 +280,15 @@ class TestScoring(unittest.TestCase):
 		self.assertTrue(dregs.check(long))
 		self.assertTrue(dregs.name(long) in dregs.names())
 		self.assertTrue(dregs.score(long) == 4)
-	
+	def testAnimals(self):
+		short = self.getCards([4,12, 16, 29])
+		animals = Animal()
+		long = copy.copy(short)
+		long.extend(self.getCards([36]))
+
+		self.assertFalse(animals.check(short))
+		self.assertTrue(animals.check(long))
+
 if __name__ == '__main__':
     unittest.main()
 
