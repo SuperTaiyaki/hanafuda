@@ -8,11 +8,29 @@
 		<script type="text/javascript" src="scripts/hanafuda.js">
 		</script>
 		<style>
-			div#fieldCards {padding-top:50px;padding-bottom:50px;}
+			div#koikoiPrompt {padding-left: 100px; padding-right:
+				100px; padding-top: 100px; padding-bottom:
+				100px;
+				background-color: #DCC;
+				position: absolute;
+				left: 40%;
+				top: 40%;
+			}
+			div#fieldCards {padding-top:50px;padding-bottom:50px;
+				clear:left;float:left}
+			div#dataBox {float:left; padding-top:90px}
+			div#playerHand {clear:left}
+			div.capdiv {padding:5px}
+			div.hand {clear:left; float:left; padding: 10px;
+				border: 1px solid black}
+			div.captures {float:left; margin: 10px}
+
+
 			img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
 			img.fieldCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
-			.cardHighlight {background-color: #000}
+			.cardHighlight {background-color: #000 !important}
 			.handDisabled {background-color: #888}
+			.card {background-color: #DDD}
 			.dragging {opacity:0.5}
 		</style>
 	</head>
@@ -21,13 +39,20 @@
 	<!-- top: opponent hand (8 blank card backs) -->
 	<div id="opponentHand" class="hand">
 %for i in range(0, 8):
-		<img class="handCard" src="img/back.gif" alt="Blank card" id="opponent_${i}" />
+		<img class="card handCard" src="img/back.gif" alt="Blank card" id="opponent_${i}" />
 %endfor
 	</div>
 
 	<!-- nearby: opponent captures (4 rows of cards?) -->
 	<div id="opponentCaptures" class="captures">
-		<img style="display:none" /> <!-- is this illegal html? -->
+		<div style="float:left;clear:left"
+			class="capdiv capturesSlips"><a></a></div>
+		<div style="float:left" class="capdiv capturesDregs">
+		<a></a></div>
+		<div style="float:left;clear:left"
+			class="capdiv capturesBrights"><a></a></div>
+		<div style="float:left" class="capdiv capturesAnimals">
+		<a></a></div>
 	</div>
 
 	<!-- middle L: field (2x6) -->
@@ -36,41 +61,53 @@
 		<table>
 			<tr>
 %for i in range(0, 12, 2):
-<td><img src="img/empty.gif" class="fieldCard" id="field_${i}" /></td>
+<td><img src="img/empty.gif" class="card fieldCard" id="field_${i}" /></td>
 %endfor
+			<td rowspan="2">
+			<div id="deck" class="deck">
+				<img src="img/back.gif" class="deckCard" id="deckCard" />
+			</div>
+			</td>
 			</tr>
 			<tr>
 %for i in range(1, 12, 2):
-<td><img src="img/empty.gif" class="fieldCard" id="field_${i}" /></td>
+<td><img src="img/empty.gif" class="card fieldCard" id="field_${i}" /></td>
 %endfor
 			</tr>
 		</table>
 	</div>
 
-	<div id="deck" class="deck">
-		<img src="img/back.gif" class="deckCard" id="deckCard" />
-	</div>
-
 	<div id="dataBox" class="databox">
+		Game id: <span id="txtGameId"></span><br />
+		Multiplier: <span id="txtMultiplier"></span><br />
+		Score: <span id="txtScore">0</span><br />
+		Opponent's score: <span id="txtOppScore">0</span><br />
 	</div>
 	<!-- middle R: scores, current multiplier, other status -->
 
 	<!-- bottom: player hand (8 face-up cards) -->
 	<div id="playerHand" class="hand">
 %for i in range(0, 8):
-		<img class="handCard" src="img/back.gif" alt="Blank card" id="player_${i}" />
+		<img class="handCard card" src="img/back.gif" alt="Blank card" id="player_${i}" />
 %endfor	
 	</div>
 	
 	<!-- bottom R: player captures (4 rows) -->
 	<div id="playerCaptures" class="captures">
-		<!-- should stick a basic layout in here... -->
-		<img style="display:none" /> <!-- is this illegal html? -->
+		<div style="float:left;clear:left"
+			class="capdiv capturesSlips"><a></a></div>
+		<div style="float:left" class="capdiv capturesDregs">
+		<a></a></div>
+		<div style="float:left;clear:left"
+			class="capdiv capturesBrights"><a></a></div>
+		<div style="float:left" class="capdiv capturesAnimals">
+		<a></a></div>
 	</div>
 
 	<div id="koikoiPrompt" class="prompt" style="display:none;">
-		<span onclick="koikoi()">Koi</span>
-		<span onclick="endGame()">Game</span>
+		<p><span onclick="koikoi()">Koi</span>
+		<span onclick="endGame()">Game</span></p>
+		<p>Hands: <span id="txtHands"></span></p>
 	</div>
 
 </body>

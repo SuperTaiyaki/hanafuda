@@ -27,12 +27,14 @@ class Server:
 		if 'player' not in cherrypy.session:
 			# find a game?
 			for i,g in enumerate(self.games):
+				print("Game ", i, " Players ", g.active_players)
 				if g.active_players < 2:
 					cherrypy.session['player'] = 1
 					cherrypy.session['game'] = i
 					player = 1
 					gr = g
 					g.active_players = 2
+					print("Joined game ", i)
 					return (gr, player)
 
 			# start a new game
@@ -42,8 +44,9 @@ class Server:
 			player = 0
 			cherrypy.session['player'] = 0
 			cherrypy.session['game'] = len(self.games) - 1 # is this
+			# why things break?
 			self.init_update()
-			# breaking any assumptions?
+			print("Created new game", cherrypy.session['game'])
 		else:
 			g = self.games[cherrypy.session['game']]
 			player = cherrypy.session['player']
@@ -65,8 +68,6 @@ class Server:
 	def watch_update(self):
 		if 'game' not in cherrypy.session:
 			raise Exception("Trying to get updates with no game")
-		print("Watching updates for player ",
-				cherrypy.session['player'])
 		id = cherrypy.session['game'] * 2 + cherrypy.session['player']
 		self.updates[id]['lock'].acquire()
 		# When that releases there's an update ready to go
@@ -108,6 +109,16 @@ class Server:
 			ret['gameid'] = cherrypy.session['game']
 
 			return json.dumps(ret)
+		elif arg == "koikoi":
+			g.koikoi()
+			# Trip a mostly empty update to make the turns switch
+			self.set_update({'active': True})
+			return json.dumps({})
+		elif arg == "endgame":
+			g.end(player)
+			# Save the results and delete the game to save memory
+			# Trigger the redirect somehow
+
 
 	def update_card(self, idx, card):
 		ret = {'id': idx}
@@ -117,8 +128,8 @@ class Server:
 		else:
 			ret['img'] = "img/" + card.image
 			ret['suit'] = "mon" + str(card.suit)
+			ret['rank'] = card.rank
 		return ret
-
 
 	@cherrypy.expose
 	def place(self, hand, field):
@@ -147,13 +158,19 @@ class Server:
 		if len(upd['caps']) > 0:
 			ret['caps_self'] = []
 			for c in upd['caps']:
-				ret['caps_self'].append({'img':"img/"+c.image})
+				ret['caps_self'].append(self.update_card(0, c))
 			oupd['caps_opp'] = ret['caps_self']
 		if upd['deck']:
 			ret['deck'] = self.update_card(0, g.get_deck_top())
 			oupd['deck'] = ret['deck']
 			# Need to set up highlighting and other junk too
-
+		if upd['koikoi']:
+			ret['koikoi'] = True # Should set up status text too
+			scores = g.get_score(player)
+			ret['yaku'] = scores.get_names()
+			ret['score'] = scores.get_score()
+			oupd['opp_score'] = ret['score']
+			
 
 		if g.get_player() != player:
 			oupd['active'] = True
@@ -168,8 +185,6 @@ class Server:
 		return json.dumps(ret)
 
 
-	# *** These update functions are not session-ized and will need to be
-	# fixed later
 	@cherrypy.expose
 	def update(self):
 		# Polling method, let the client know if anything can be updated
@@ -178,8 +193,21 @@ class Server:
 
 	@cherrypy.expose
 	def board(self):
+		# Initiate the session if necessary
+		(g, player) = self.getsession()
 		tmpl = Template(filename="board.html")
 		return tmpl.render()
+
+	# Summary screen after the game is over
+	@cherrypy.expose
+	def scores(self):
+		(g, player) = self.getsession()
+		tmpl = Template(filename="scores.html")
+		won = False
+		if g.winner == player:
+			won = True
+
+#		return tmpl.render(
 
 root = Server()
 

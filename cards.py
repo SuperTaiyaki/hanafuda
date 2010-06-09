@@ -2,6 +2,7 @@
 
 # Main hanafuda game handling class
 import yaml
+import unittest
 
 # abstract card
 class Card:
@@ -133,7 +134,7 @@ class Slip(Yaku):
 		self._name = "Poems" # タン
 	def score(self, caps):
 		# 1 basic + 1 for each slip after
-		f = self._filter_attrs('slip', caps)
+		f = self._filter_attr('slip', caps)
 		return len(f) - 4
 @define_hand
 class Hanami(Yaku): # err, should be doing this in English, but 'moon viewing' is long
@@ -161,7 +162,7 @@ class ISC(Yaku):
 		self.points = 6
 	def score(self, caps):
 		# 6 basic + 3 for each animal afterwards
-		f = self._filter_attrs('animal', caps)
+		f = self._filter_attr('animal', caps)
 		return len(f) + 3
 @define_hand
 class Animal(Yaku):
@@ -172,7 +173,7 @@ class Animal(Yaku):
 		self._name = "Earth" # タネ
 	def score(self, caps):
 		# 1 basic + 1 for each animal after
-		f = self._filter_attrs('slip', caps)
+		f = self._filter_attr('animal', caps)
 		return len(f) - 4
 @define_hand
 class Dregs(Yaku):
@@ -234,6 +235,10 @@ class Scoring:
 				for item in sublist]
 		# Associate each hand with its name
 		self.names = dict.fromkeys(self.names, None)
+		self.yakus = {}
+		for h in self.hands:
+			self.yakus[h] = None
+
 	def update(self, caps):
 		score = 0
 		new = False
@@ -241,9 +246,44 @@ class Scoring:
 			if y.check(caps):
 				score += y.score(caps)
 				n = y.name(caps)
-				if not self.names[n]:
-					new = True
+				self.yakus[y] = n
 				self.names[y.name] = True
+		print("Old: ", self.total, "New: ", score)
+		if score > self.total:
+			new = True
 		self.total = score
 		return new
+
+	def get_score(self):
+		return self.total
+	def get_names(self):
+		ret = []
+		for g in self.yakus:
+			if self.yakus[g]:
+				ret.append(self.yakus[g])
+		return ret
+
+# {{{ Tests
+
+class TestScoring(unittest.TestCase):
+	def setUp(self):
+		self.deck = create_deck()
+	def getCards(self, cards):
+		return map(lambda c: self.deck[c], cards)
+
+	def testJunk(self):
+		short = self.getCards(range(0, 9))
+		# The first couple of dregs cards
+		long = self.getCards([2,3,6,7,10,11,14,15,18,19, 45, 46, 47])
+
+		dregs = Dregs()
+		self.assertFalse(dregs.check(short))
+		self.assertTrue(dregs.check(long))
+		self.assertTrue(dregs.name(long) in dregs.names())
+		self.assertTrue(dregs.score(long) == 4)
+	
+if __name__ == '__main__':
+    unittest.main()
+
+# }}}
 

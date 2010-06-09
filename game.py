@@ -33,6 +33,7 @@ class Game:
 		self.active_players = 0
 		
 		self.multiplier = 1
+		self.winner = None
 
 	def get_player(self):
 		return self.player
@@ -47,6 +48,9 @@ class Game:
 		return self.field
 	def get_deck_top(self):
 		return self.deck_top
+
+	def end(self, player):
+		self.winner = player
 
 	def hand_match(self, player):
 		# For each item in the hand make a list of matching items in the
@@ -63,6 +67,8 @@ class Game:
 		print("Player: ", player, " Hand: ", hand, " Field: ", field)
 		if player != self.player:
 			raise GameError("Wrong player's turn")
+		if hand != -1 and self.hands[player][hand] == None:
+			raise GameError("Invalid card")
 		if hand != -1 and self.field[field] != None and self.field[field].suit != self.hands[player][hand].suit:
 			print self.field[field]
 			print self.hands[player][hand]
@@ -86,20 +92,28 @@ class Game:
 
 		# Match the existing card
 		if self.field[field] == None:
-			# Just sending it to the field
-			# Grab the first available slot
-			idx = self.field.index(None)
-			# that will bug out if the field ever fills...
-			self.field[idx] = self.hands[player][hand]
-			changes['field'].append(idx)
+			self.field[field] = self.hands[player][hand]
+			changes['field'].append(field)
 			self.hands[player][hand] = None
 			changes['hand'].append(hand)
 		else:
 			# Actually matching something
-			self.captures[player].extend([self.field[field], self.hands[player][hand]])
-			changes['caps'].extend([self.field[field], self.hands[player][hand]])
-			self.field[field] = None
-			changes['field'].append(field)
+			# Check for 3 matching cards
+			matches = self._search_field(self.hands[player][hand].suit)
+			if (len(matches) == 3):
+				cap_cards = map(lambda x: self.field[x], matches)
+				cap_cards.append(self.hands[player][hand])
+				self.captures[player].extend(cap_cards)
+				changes['caps'].extend(cap_cards)
+				for x in matches:
+					self.field[x] = None
+					changes['field'].append(x)
+			else:
+				self.captures[player].extend([self.field[field], self.hands[player][hand]])
+				changes['caps'].extend([self.field[field], self.hands[player][hand]])
+				self.field[field] = None
+				changes['field'].append(field)
+
 			self.hands[player][hand] = None
 			changes['hand'].append(hand)
 			if hand == -1: # Special case, matching from the deck to
@@ -140,6 +154,11 @@ class Game:
 		# TODO: This will also need to check for fresh yakus
 		newyaku = self.scores[player].update(self.captures[player])
 		changes['koikoi'] = newyaku
+
+		if len(self.hands[player]) == 0 and self.player != self.dealer:
+			# Ran out of cards, the game is over
+
+
 		if not changes['deck'] and not newyaku:
 			self.player = 1 if self.player == 0 else 0
 		return changes
@@ -148,7 +167,7 @@ class Game:
 		self.multiplier *= 2
 		self.player = 1 if self.player == 0 else 0
 	
-	def score(self, player):
+	def get_score(self, player):
 		return self.scores[player]
 		
 	def _search_field(self, suit):
