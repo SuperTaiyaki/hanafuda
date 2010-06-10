@@ -114,6 +114,7 @@ class Game:
 				# the field. Don't need to draw
 				# But still do need to change player
 				self.player = 1 if self.player == 0 else 0
+				changes['deck'] = -2
 				return changes
 
 		# Draw a card, etc.
@@ -148,10 +149,12 @@ class Game:
 		newyaku = self.scores[player].update(self.captures[player])
 		changes['koikoi'] = newyaku
 
-		if len(self.hands[player]) == 0 and self.player != self.dealer:
+		# out of cards. If there's a yaku, win the round; if not the
+		# dealer, continue; otherwise draw
+		if len(self.hands[player]) == 0:
 			if newyaku:
 				self.winner = player
-			else:
+			elif self.player != dealer:
 				self.winner = 3; # nobody
 
 		if changes['deck'] != -1 and not newyaku:

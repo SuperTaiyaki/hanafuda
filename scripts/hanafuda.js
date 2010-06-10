@@ -1,5 +1,3 @@
-
-// the list of matchable cards
 //jquery should be loaded
 
 
@@ -26,6 +24,7 @@ function clear_suit(el) {
 //apply attributes to a card
 function set_card(card, data) {
 	card.attr('src', data.img);
+	//card.src = data.img;
 	card.addClass(data.suit);
 	card.data('suit', data.suit);
 	card.data('rank', data.rank);
@@ -69,7 +68,8 @@ function screen_off() {
 	$("#screen").css('display', 'none');
 }
 
-function captureDest(rank, path) {
+/* Find the correct slot for a captured card */
+function capture_dest(rank, path) {
 	var group = "Dregs";
 	switch(rank) {
 		case 20:
@@ -83,42 +83,6 @@ function captureDest(rank, path) {
 	}
 	var target = path.children(".captures" + group).children().last();
 	return target;
-}
-
-/* Take a list of captures and insert it into the captures box given. The main
- * work of this is to group them correctly.
- */
-function addCaptures(caps, path) {
-	var i;
-	for (i = 0;i < caps.length;i++) {
-		var group = "Dregs";
-		switch(caps[i].rank) {
-			case 20:
-				group = "Brights";
-				break;
-			case 10:
-				group = "Animals";
-				break;
-			case 5:
-				group = "Slips";
-		}
-		var img = "<img src=\"" + caps[i].img + "\" class=\"capCard\" />";
-		var target = path.children(".captures" + group).children().last();
-		target.after(img);
-	}
-}
-
-/* Update cards in the field */
-function updateField(cards) {
-	for (i = 0;i < cards.length;i++) {
-		var el = cards[i];
-		var cn = "#field_" + el.id;
-		var card = $(cn);
-		card.attr('src', el.img);
-		clear_suit(card);
-		card.addClass(el.suit);
-		card.data('suit', el.suit);
-	}
 }
 
 /* Set the player's hand as active or inactive. This currently involves a grey
@@ -214,15 +178,19 @@ function update_animate(data) {
 	
 	var el = 0;
 	var caps = data.player ? $("#playerCaptures") : $("#opponentCaptures");
-	var do_caps1; //anything to capture in the first round?
 	var time = 0;
 		
-		//expose the card first
 	if (!data.player) {
-		el = extract_card(get_opphand(data.hand[0]));
-		set_card(el, data.handcard);
+		if (data.deck == -2) {
+			el = $("#flyingCard");
+			blank_card(get_deckcard());
+			get_deckcard().attr('src', 'img/back.gif');
+		} else {
+			el = extract_card(get_opphand(data.hand[0]));
+			set_card(el, data.handcard);
+			el.attr('id', 'flyingCard');
+		}
 
-		el.attr('id', 'flyingCard');
 		var dest = get_field(data.hand[1]);
 		var tgt;
 		var cb;
@@ -266,8 +234,6 @@ function update_animate(data) {
 		}
 	}
 
-	//time = 1 slide, speed is 600ms (maybe)
-
 	//function to make a class sit in the captures pile
 	function settle_card(container, card) {
 		container.append(card);
@@ -290,21 +256,27 @@ function update_animate(data) {
 			var fcc = lift_card(fc);
 			blank_card(fc);
 
-			var tgti = captureDest(fcc.data('rank'), caps);
+			var tgti = capture_dest(fcc.data('rank'), caps);
 
 			move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc, i));
 		}
 		var fc = $("#flyingCard");
-		var tgt = captureDest(fc.data('rank'), caps);
+		var tgt = capture_dest(fc.data('rank'), caps);
 		move_card(fc, tgt.offset(), make_settlecard(tgt, fc));
 	}
 
 	function move_decktop() {
 		if (data.deck == -1) {
 			set_card(get_deckcard(), data.deckcard);
+			clear_suit(get_deckcard());
 			
 			if (data.player)
 				deckselect_enable(data.deckcard);
+			else {
+				var dc = get_deckcard();
+				var c = lift_card(dc);
+				c.attr('id', 'flyingCard');
+			}
 			return;
 		}
 
@@ -341,19 +313,21 @@ function update_animate(data) {
 			var fc =  get_field(data.field2[i]);
 			var fcc = lift_card(fc);
 			blank_card(fc);
-			var tgti = captureDest(fcc.data('rank'), caps);
+			var tgti = capture_dest(fcc.data('rank'), caps);
 			move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc));
 		}
 		var fc = $("#flyingCard2");
-		var tgt = captureDest(fc.data('rank'), caps);
+		var tgt = capture_dest(fc.data('rank'), caps);
 		move_card(fc, tgt.offset(), make_settlecard(tgt, fc));
 	}
-
-	// 1 move in action by this point
 
 	if (data.field1.length > 0) {
 		setTimeout(function() {field_caps1();}, time);
 		time += 800;
+	}
+
+	if (data.deck == -2) {
+		return; //half update, just the player selection
 	}
 
 	setTimeout(function() {move_decktop();}, time);
@@ -416,85 +390,6 @@ function update(json) {
 	}
 
 }
-/* General update worker function, take an update from the backend and process
- * the fields.
- */
-function update_static(json) {
-	if (json.error) {
-		alert(json.error);
-		return;
-	}
-	var i;
-
-	if (json.field) {
-		updateField(json.field)
-	}
-	if (json.hand) {
-		// hide cards from the player's own hand
-		for (i = 0;i < json.hand.length;i++) {
-			var idx = json.hand[i];
-			var cn = "#player_" + idx;
-			$(cn).css('display', 'none');
-		}
-	}
-	if (json.opp_hand) {
-		//update opponent's hand
-		$("#opponent_" + json.opp_hand[0]).css('display', 'none');
-	}
-	if (json.caps_self) {
-		//update own captures
-		addCaptures(json.caps_self, $("#playerCaptures"));
-	}
-	if (json.caps_opp) {
-		//update opponent's captures
-		addCaptures(json.caps_opp, $("#opponentCaptures"));
-	}
-
-	if (json.deck) {
-		//let the player match the deck card to a field card
-		//inactive player gets to watch, but not to act
-		$("#deckCard").attr('src', json.deck.img);
-		if (json.active) {
-			deckselect_enable(json.deck);
-		}
-	}
-	if (json.deck_clear) {
-		$("#deckCard").attr('src', "img/back.gif");
-	}
-
-	if (json.koikoi) {
-		var yakus = ""
-		for (i = 0;i < json.yaku.length;i++) {
-			yakus += json.yaku[i] + "<br />";
-		}
-		$("#txtHands").html(yakus);
-		$("#koikoiPrompt").css('display', 'block');
-		screen_on();
-	}
-
-	if (json.score) {
-		$("#txtScore").text(json.score);
-	} else if (json.opp_score) {
-		$("#txtOppScore").text(json.opp_score);
-	}
-	
-	//Results display
-	if (json.results) {
-		$("#results").html(json.results);
-		$("#results").css('display', 'block');
-		$("#results").draggable(); //if the user wants to see stuff
-		screen_on();
-		return; //don't let the comet restart
-	}
-
-
-	if (!json.active) {
-		disable_hand();
-		setTimeout("comet()", 500);
-	} else {
-		enable_hand();
-	}
-}
 
 function comet() {
 	cometactive = true; //because it will block other ajax requests
@@ -513,7 +408,7 @@ function init() {
 			//hand
 			for (i = 0;i < 8;i++) {
 				var cn = "#player_" + i;
-				if (json.hand[i].suit == -1) {
+				if (json.hand[i].rank == -1) {
 					$(cn).css('display', 'none');
 				} else {
 					set_card($(cn), json.hand[i]);
@@ -528,10 +423,19 @@ function init() {
 				$(cn).data('id', i);
 			}
 
+			for (i = 0;i < json.captures_player.length;i++) {
+				var tgt = capture_dest(json.captures_player[i].rank, $("#playerCaptures"));
+				tgt.append("<img src=\"" + json.captures_player[i].img + "\" />");
+			}
+			for (i = 0;i < json.captures_opp.length;i++) {
+				var tgt = capture_dest(json.captures_opp[i].rank, $("#opponentCaptures"));
+				tgt.append("<img src=\"" + json.captures_opp[i].img + "\" />");
+			}
 			$("#deckCard").data('id', -1);
 
 			$(".fieldCard").droppable({drop: function(event, ui) {
-					place(ui.draggable.data("id"), $(this).data("id"), $(ui.draggable));
+					place(ui.draggable.data("id"), $(this).data("id"),
+						ui.draggable, ui.position);
 					},
 					'disabled': true});
 
@@ -571,20 +475,12 @@ function init() {
 			});
 	$("#deckCard").draggable({helper: 'clone',
 			disabled: true});
-
-//	setTimeout(function() {update_animate({hand: 2, field: [2], deck: [1]});}, 500);
-/*	setTimeout(function() {later();}, 1000);
-	function later() {
-		alert("Later?");
-	}*/
-/*	clone = extract_card($("#deckCard"));
-	move_card(clone, {left: 0, top: 0}, function() {alert("Callback!");});*/
 }
 
 function mark_field(month, blank) {
 	if (dragging || deck_select)
 		return;
-	var tgts = $(".fieldCard." + month);
+	var tgts = $("#fieldCards ." + month);
 	if (tgts.length > 0)
 		tgts.addClass('cardHighlight');
 	else if (blank)
@@ -602,8 +498,15 @@ function unmark_field() {
  * handID: ID of the card taken (-1 if it's from the deck, special case)
  * fieldID: ID of the card matched
  */
-function place(handID, fieldID, el) {
-	extract_card(el);
+function place(handID, fieldID, el, tgt) {
+	if (deck_select) {
+		el = lift_card(el);
+	} else {
+		extract_card(el);
+	}
+	el.css('top', tgt.top);
+	el.css('left', tgt.left);
+	el.css('opacity', 1.0);
 	//clear_suit(el); // this data is still useful
 	el.attr('id', 'flyingCard');
 	if (cometactive) {

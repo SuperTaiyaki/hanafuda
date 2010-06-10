@@ -55,12 +55,15 @@
 			/* 620px calculated from a full hand */
 			div.hand {clear:left; float:left; padding: 10px;
 				border: 1px solid black; width: 620px}
-			div.captures {float:left; margin: 10px}
+			div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
+				margin-right: -80%;}
+			div#deck {z-index: -1;}
 
 
 			img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
 			img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
 				z-index: 5;}
+			img.deckCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
 			img.capCard {margin-right: -20px}
 			.cardHighlight {background-color: #807575 !important}
 			.handDisabled {background-color: #888}
@@ -150,6 +153,10 @@
 	<div id="alert" class="alert">
 		<span id="txtAlert"></span>
 	</div>
-
+<!-- Firefox is a bit brain-dead, if images aren't preloaded stuff doesn't work
+right -->
+% for img in images:
+<img src="${img}" style="display: none" />
+% endfor
 </body>
 </html>

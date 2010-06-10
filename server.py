@@ -112,6 +112,14 @@ class Server:
 			for c in g.get_field():
 				ret['field'].append(self.update_card(c))
 			
+			ret['captures_player'] = []
+			for c in g.get_captures(player):
+				ret['captures_player'].append(self.update_card(c))
+
+			ret['captures_opp'] = []
+			for c in g.get_captures((player + 1) % 2):
+				ret['captures_opp'].append(self.update_card(c))
+
 			if g.get_player() == player:
 				ret['active'] = True
 
@@ -231,8 +239,10 @@ class Server:
 	def board(self):
 		# Initiate the session if necessary
 		(g, player) = self.getsession()
+		deck = cards.create_deck()
+		deck = map(lambda x: "img/" + x.image, deck)
 		tmpl = Template(filename="board.html")
-		return tmpl.render()
+		return tmpl.render(images = deck)
 
 
 	@cherrypy.expose
