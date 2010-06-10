@@ -41,7 +41,17 @@
 				display: none;
 				z-index: 10;
 				opacity: 0.5;}
+			div#alert {position:absolute;
+				width:500;
+				left:100px;
+				background-color: #BBB;
+				top:0px;
+				height:50px;
+				display:none;}
+				
 			div.capdiv {padding:5px}
+
+
 			/* 620px calculated from a full hand */
 			div.hand {clear:left; float:left; padding: 10px;
 				border: 1px solid black; width: 620px}
@@ -136,6 +146,9 @@
 	<div id="results" class="results">
 	</div>
 	<div id="screen">
+	</div>
+	<div id="alert" class="alert">
+		<span id="txtAlert"></span>
 	</div>
 
 </body>

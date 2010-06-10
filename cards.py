@@ -277,6 +277,7 @@ def win_hand(hand):
 	f = filter(None, count)
 	if min(f) == max(f) == 2:
 		return(True, "All pairs")
+	return (False, [])
 		
 
 def bad_field(field):
@@ -285,8 +286,9 @@ def bad_field(field):
 	for s in suits:
 		count[s] += 1
 	
-	if max(s) == 4:
+	if max(count) == 4:
 		return (True, "Full suit")
+	return (False, "")
 
 # {{{ Tests
 import copy

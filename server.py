@@ -56,7 +56,11 @@ class Server:
 
 		return (g, player)
 	def reset_game(self):
-		self.games[cherrypy.session['game']] = game.Game(cards.create_deck(), 0)
+		g = game.Game(cards.create_deck(), 0)
+		g.active_players = 2
+		print g.get_hand(0)
+		self.games[cherrypy.session['game']] = g
+
 
 	# Threaded functions for moving updates between players
 	# Note that watch and update operate on alternate players
@@ -118,7 +122,10 @@ class Server:
 			g.koikoi()
 			# Trip a mostly empty update to make the turns switch
 			# Should also show the opponent what happened
-			self.set_update({'active': True})
+			alert  = "Opponent did not koikoi.<br />"
+			alert += "Multiplier is now %ix" % g.multiplier
+
+			self.set_update({'active': True, 'alert': alert})
 			return json.dumps({})
 		elif arg == "endgame":
 			g.end(player)
@@ -126,6 +133,7 @@ class Server:
 			ret = {'results': self.score(g, player)}
 			p2 = 1 if player == 0 else 0
 			oupd = {'results': self.score(g, p2)}
+			self.reset_game()
 			self.set_update(oupd)
 			return json.dumps(ret)
 
@@ -184,6 +192,7 @@ class Server:
 			ret['score'] = scores.get_score()
 			oupd['opp_score'] = ret['score']
 			oupd['koikoi'] = False # Later need to replace this with
+
 #			a message
 
 		# If the game is over also bring up the results page
@@ -234,6 +243,7 @@ class Server:
 		elif args == "koikoi":
 			c = cards.Card("jan1.gif", 1)
 			c.attrs['bright'] = True
+			c.rank = 20
 			g.captures[player].extend([c] * 5)
 
 

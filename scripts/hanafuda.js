@@ -37,18 +37,21 @@ function set_card(card, data) {
  */
 function deckselect_enable(card) {
 	$("#deckCard").draggable("option", "disabled", false);
+	$("#deckCard").addClass("cardHighlight");
 	unmark_field();
 	var month = card.suit;
 	mark_field(month, false);
 	//should disable highlight and dragging for the main cards
 	$(".fieldCard:not(." + month + ")").droppable("option", "disabled", true);
+	$(".fieldCard." + month).droppable("option", "disabled", false)
 	$(".handCard").draggable("option", "disabled", true);
 	deck_select = true;
 }
 
 function deckselect_disable(card) {
 	//restore the old state
-	$("#deckCard").attr('src', "img/back.gif");
+	$("#deckCard").attr('src', "img/back.gif")
+	$("#deckCard").removeClass("cardHighlight");
 	$("#deckCard").draggable("option", "disabled", true);
 	$(".fieldCard").droppable("option", "disabled", false);
 	$(".handCard").draggable("option", "disabled", false);
@@ -266,13 +269,18 @@ function update_animate(data) {
 	//time = 1 slide, speed is 600ms (maybe)
 
 	//function to make a class sit in the captures pile
-	function settle_card(card) {
+	function settle_card(container, card) {
+		container.append(card);
 		card.css('position', 'static');
 		card.attr('id', '');
 		card.removeClass().addClass("card capCard");
 		card.draggable("option", "disabled", true);
 	}
-
+	//get around annoying JS not-really-closures
+	function make_settlecard(container, card) {
+		return function() {
+			settle_card(container, card);};
+	}
 
 	function field_caps1() {
 		//move flyingCard and field[data.field1[]] to captures
@@ -283,16 +291,12 @@ function update_animate(data) {
 			blank_card(fc);
 
 			var tgti = captureDest(fcc.data('rank'), caps);
-			move_card(fcc, tgti.offset(), function() {
-					tgti.append(fcc);
-					settle_card(fcc);});
+
+			move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc, i));
 		}
 		var fc = $("#flyingCard");
 		var tgt = captureDest(fc.data('rank'), caps);
-		move_card(fc, tgt.offset(), function() {
-				tgt.append(fc);
-				settle_card(fc);
-				});
+		move_card(fc, tgt.offset(), make_settlecard(tgt, fc));
 	}
 
 	function move_decktop() {
@@ -338,16 +342,11 @@ function update_animate(data) {
 			var fcc = lift_card(fc);
 			blank_card(fc);
 			var tgti = captureDest(fcc.data('rank'), caps);
-			move_card(fcc, tgti.offset(), function() {
-					tgti.append(fcc);
-					settle_card(fcc);});
+			move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc));
 		}
 		var fc = $("#flyingCard2");
 		var tgt = captureDest(fc.data('rank'), caps);
-		move_card(fc, tgt.offset(), function() {
-				tgt.append(fc);
-				settle_card(fc);
-				});
+		move_card(fc, tgt.offset(), make_settlecard(tgt, fc));
 	}
 
 	// 1 move in action by this point
@@ -392,6 +391,12 @@ function update(json) {
 		}
 
 
+	}
+	if (json.alert) {
+		$("#txtAlert").html(json.alert);
+		$("#alert").slideDown('fast', function() {
+				setTimeout(function() {$("#alert").slideUp('fast');}, 1000);
+				});
 	}
 
 	//Results display

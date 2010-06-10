@@ -9,13 +9,21 @@ class Game:
 	# Dealer should be 0 or 1
 	def __init__(self, deck, dealer = -1):
 		# Actually not an ideal shuffle according to the docs
-		random.shuffle(deck)
-		self.cards = deck
 		# take the first 3 slices of 8 cards to make the hands and field
-		self.hands = (self.cards[0:8], self.cards[8:16])
-		self.captures = ([], [])
-		self.scores = (cards.Scoring(), cards.Scoring())
-		self.field = self.cards[16:24]
+		self.cards = deck[:]
+		def draw():
+			random.shuffle(self.cards)
+			self.hands = (self.cards[0:8], self.cards[8:16])
+			self.captures = ([], [])
+			self.scores = (cards.Scoring(), cards.Scoring())
+			self.field = self.cards[16:24]
+
+		draw()
+		while (cards.win_hand(self.hands[0])[0] or
+			cards.win_hand(self.hands[1])[0] or
+			cards.bad_field(self.field)[0]):
+			draw()
+
 		# Pad up to FIELD_SIZE with Nones
 		self.field.extend([None] * (self.FIELD_SIZE - len(self.field)))
 
