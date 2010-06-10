@@ -150,7 +150,7 @@ function drag_targets(suit, blank) {
  * call the callback.
  */
 function move_card(el, target, callback) {
-	el.animate(target, 600, 'swing', callback);
+	el.animate(target, 'fast', 'swing', callback);
 }
 /* Clone an element but overlay it onto the original */
 function lift_card(el) {
@@ -210,9 +210,9 @@ function update_animate(data) {
 	//	deck match (only if deck isn't -1)
 	
 	var el = 0;
-	var time = 0
 	var caps = data.player ? $("#playerCaptures") : $("#opponentCaptures");
 	var do_caps1; //anything to capture in the first round?
+	var time = 0;
 		
 		//expose the card first
 	if (!data.player) {
@@ -232,17 +232,19 @@ function update_animate(data) {
 		} else {
 			tgt = dest.offset();
 			cb = function() {
-				dest.replaceWith(el);
-				el.css('position', 'static');
-				//set up the attributes to make it into an
-				//actual field card
-				el.data('id', data.hand[1]);
-				el.attr('id', "field_" + data.hand[1]);
-				//forgotten any attributes?
+				//don't actually replace the element, that kills
+				//the attributes
+				var c = {img: el.attr('src'),
+					suit: el.data("suit"),
+					rank: el.data("rank")};
+				clear_suit(dest);
+				set_card(dest, c);
+				el.remove();
 			}
 		}
 		//let the card sit for a moment...
-		move_card(el, tgt, cb);
+		setTimeout(function() {move_card(el, tgt, cb);}, 200);
+		time += 800;
 	} else {
 		var dest = get_field(data.hand[1]);
 		if (dest.data('suit') == "empty") {
@@ -261,9 +263,6 @@ function update_animate(data) {
 		}
 	}
 
-
-	time += (600 + 200) //200 delay, 600 to move
-	
 	//time = 1 slide, speed is 600ms (maybe)
 
 	//function to make a class sit in the captures pile
@@ -297,6 +296,14 @@ function update_animate(data) {
 	}
 
 	function move_decktop() {
+		if (data.deck == -1) {
+			set_card(get_deckcard(), data.deckcard);
+			
+			if (data.player)
+				deckselect_enable(data.deckcard);
+			return;
+		}
+
 		var dc = get_deckcard();
 		var dcc = lift_card(dc);
 
@@ -305,13 +312,6 @@ function update_animate(data) {
 
 		//change the name just in case the animations overlap
 		dcc.attr('id', 'flyingCard2');
-
-		if (data.deck == -1) {
-			if (data.player)
-				deckselect_enable(data.deckcard);
-			return;
-		}
-
 		var tgt = get_field(data.deck);
 		var tgtpos = tgt.offset();
 		var cb;
@@ -349,13 +349,20 @@ function update_animate(data) {
 				settle_card(fc);
 				});
 	}
-	if (data.field1.length > 0)
-		setTimeout(function() {field_caps1();}, 1000);
 
-	setTimeout(function() {move_decktop();}, 1500);
+	// 1 move in action by this point
+
+	if (data.field1.length > 0) {
+		setTimeout(function() {field_caps1();}, time);
+		time += 800;
+	}
+
+	setTimeout(function() {move_decktop();}, time);
+	if (data.deck != -1)
+		time += 800;
 
 	if (data.field2.length > 0) {
-		setTimeout(function() {deck_capture();}, 2400);
+		setTimeout(function() {deck_capture();}, time);
 	}
 }
 function update(json) {

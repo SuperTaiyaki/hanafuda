@@ -262,6 +262,32 @@ class Scoring:
 				ret.append(self.yakus[g])
 		return ret
 
+# Special hands
+def win_hand(hand):
+	suits = map(lambda x: x.suit, hand)
+	count = [0] * 12
+	for s in suits:
+		count[s] += 1
+	
+	# four of one suit in the hand
+	if max(count) == 4:
+		return (True, "Full suit")
+
+	# excluding 0s, all pairs in the hand
+	f = filter(None, count)
+	if min(f) == max(f) == 2:
+		return(True, "All pairs")
+		
+
+def bad_field(field):
+	suits = map(lambda x: x.suit, field)
+	count = [0] * 12
+	for s in suits:
+		count[s] += 1
+	
+	if max(s) == 4:
+		return (True, "Full suit")
+
 # {{{ Tests
 import copy
 class TestScoring(unittest.TestCase):
@@ -288,6 +314,26 @@ class TestScoring(unittest.TestCase):
 
 		self.assertFalse(animals.check(short))
 		self.assertTrue(animals.check(long))
+
+class TestDraws(unittest.TestCase):
+	def setUp(self):
+		self.deck = create_deck()
+	def getCards(self, cards):
+		return map(lambda c: self.deck[c], cards)
+
+	def testPairs(self):
+		norm = self.getCards([0,1,5,6,10,20,30,40])
+		fail = self.getCards([0,1,4,5,8,9,12,13])
+
+		self.assertFalse(win_hand(norm) == (True, "All pairs"))
+		self.assertTrue(win_hand(fail) == (True, "All pairs"))
+	def testfullSuit(self):
+		norm = self.getCards([0,1,5,6,10,20,30,40])
+		fail = self.getCards([0,1,2,3,8,9,12,13])
+
+		self.assertFalse(win_hand(norm) == (True, "Full suit"))
+		self.assertTrue(win_hand(fail) == (True, "Full suit"))
+
 
 if __name__ == '__main__':
     unittest.main()
