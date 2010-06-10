@@ -20,6 +20,15 @@ function clear_suit(el) {
 		el.removeClass("mon" + i);
 	}
 	el.removeClass("empty");
+	el.data('suit', "empty");
+}
+
+//apply attributes to a card
+function set_card(card, data) {
+	card.attr('src', data.img);
+	card.addClass(data.suit);
+	card.data('suit', data.suit);
+	card.data('rank', data.rank);
 }
 
 /* enter deck selection mode, where there are multiple options from the field to
@@ -27,9 +36,9 @@ function clear_suit(el) {
  * it to field cards of the same suit.
  */
 function deckselect_enable(card) {
-	$("#deckCard").draggable({helper: 'clone'});
+	$("#deckCard").draggable("option", "disabled", false);
 	unmark_field();
-	var month = card.suit
+	var month = card.suit;
 	mark_field(month, false);
 	//should disable highlight and dragging for the main cards
 	$(".fieldCard:not(." + month + ")").droppable("option", "disabled", true);
@@ -40,6 +49,7 @@ function deckselect_enable(card) {
 function deckselect_disable(card) {
 	//restore the old state
 	$("#deckCard").attr('src', "img/back.gif");
+	$("#deckCard").draggable("option", "disabled", true);
 	$(".fieldCard").droppable("option", "disabled", false);
 	$(".handCard").draggable("option", "disabled", false);
 	deck_select = false;
@@ -145,12 +155,14 @@ function move_card(el, target, callback) {
 /* Clone an element but overlay it onto the original */
 function lift_card(el) {
 	var pos = el.offset();
+	//could clone with 'true' to make sure all .data moves too
+	//only need rank though
 	var clone = el.clone().appendTo('body');
+	clone.data('rank', el.data('rank'));
 	clone.css('top', pos.top);
 	clone.css('left', pos.left);
 	clone.css('position', 'absolute');
 	return clone;
-//	clone.draggable();
 }
 
 /* Pull a card out of the layout (the real card) */
@@ -161,7 +173,6 @@ function extract_card(el) {
 	el.css('left', pos.left);
 	el.css('position', 'absolute');
 	return el;
-//	clone.draggable();
 }
 
 //set a field card to an empty space
@@ -188,27 +199,28 @@ function get_deckcard() {
 
 function update_animate(data) {
 	//format of data is
-	//hand: id of card moved from hand to field (-1 if active player)
-	//	Note this is an index into the opponent's hand
-	//field: field id(s) of card matched to hand
-	//deck: field id(s) of card matched to deck
-	//field2: id of card moved from deck to field
-	//player: whether this is for the player or the opponent
-	//only one of deck or field2 should be used
-	
-	// Before entering this function:
-	// -Set the field card the player put down (if it didn't match)
-	// -Expose the card the opponent played
-	// -Expose the card on the deck
+	//hand: [hand id, field id]
+	//	hand id is -1 for the deck card
+	//field1: [field id]* cards moving from the field to the captures pile
+	//deck: field id
+	//	the id of the field location the deck card will move to (-1 if
+	//	it's not moving)
+	//field2: [field id]*
+	//	ids of the cards moving from the field to captures due to the
+	//	deck match (only if deck isn't -1)
 	
 	var el = 0;
+	var time = 0
 	var caps = data.player ? $("#playerCaptures") : $("#opponentCaptures");
 	var do_caps1; //anything to capture in the first round?
-	if (!data.player && data.field) {
-		//move hand[data.hand] to field[0]
-		el = extract_card(get_opphand(data.hand));
+		
+		//expose the card first
+	if (!data.player) {
+		el = extract_card(get_opphand(data.hand[0]));
+		set_card(el, data.handcard);
+
 		el.attr('id', 'flyingCard');
-		var dest = get_field(data.field[0]);
+		var dest = get_field(data.hand[1]);
 		var tgt;
 		var cb;
 		// if field[data.field] is empty, plant this card there
@@ -217,21 +229,41 @@ function update_animate(data) {
 			tgt.top += 25;
 			tgt.left += 25;
 			cb = "void()";
-			do_caps1 = true;
 		} else {
 			tgt = dest.offset();
-			do_caps1 = false;
 			cb = function() {
-				//copy the attributes down and delete
-				//TODO
+				dest.replaceWith(el);
+				el.css('position', 'static');
+				//set up the attributes to make it into an
+				//actual field card
+				el.data('id', data.hand[1]);
+				el.attr('id', "field_" + data.hand[1]);
+				//forgotten any attributes?
 			}
 		}
-
+		//let the card sit for a moment...
 		move_card(el, tgt, cb);
+	} else {
+		var dest = get_field(data.hand[1]);
+		if (dest.data('suit') == "empty") {
+			var fc = $("#flyingCard");
+			//card has attributes and junk, so manually copy over
+			//the important stuff
+			var c = {img: fc.attr('src'),
+				suit: fc.data("suit"),
+				rank: fc.data("rank")};
+			clear_suit(dest);
+			set_card(dest, c);
+			dest.data('id', data.hand[1]);
+			dest.attr('id', "field_" + data.hand[1]);
+			dest.removeClass("handCard").addClass("fieldCard");
+			fc.remove();
+		}
 	}
-	
-	//if the card was just laid down there's nothing to do
 
+
+	time += (600 + 200) //200 delay, 600 to move
+	
 	//time = 1 slide, speed is 600ms (maybe)
 
 	//function to make a class sit in the captures pile
@@ -239,24 +271,25 @@ function update_animate(data) {
 		card.css('position', 'static');
 		card.attr('id', '');
 		card.removeClass().addClass("card capCard");
+		card.draggable("option", "disabled", true);
 	}
 
 
 	function field_caps1() {
-		//move flyingCard and field[data.field[]] to captures
+		//move flyingCard and field[data.field1[]] to captures
 		var i;
-		for (i = 0;i < data.field.length;i++) {
-			var fc =  get_field(data.field[i]);
+		for (i = 0;i < data.field1.length;i++) {
+			var fc =  get_field(data.field1[i]);
 			var fcc = lift_card(fc);
 			blank_card(fc);
-			var tgt = captureDest(fcc.data('rank'), caps);
-			move_card(fcc, tgt.offset(), function() {
-					tgt.append(fcc);
+
+			var tgti = captureDest(fcc.data('rank'), caps);
+			move_card(fcc, tgti.offset(), function() {
+					tgti.append(fcc);
 					settle_card(fcc);});
 		}
 		var fc = $("#flyingCard");
 		var tgt = captureDest(fc.data('rank'), caps);
-		//ewwww
 		move_card(fc, tgt.offset(), function() {
 				tgt.append(fc);
 				settle_card(fc);
@@ -266,147 +299,94 @@ function update_animate(data) {
 	function move_decktop() {
 		var dc = get_deckcard();
 		var dcc = lift_card(dc);
+
+		//expose dcc
+		set_card(dcc, data.deckcard);
+
 		//change the name just in case the animations overlap
 		dcc.attr('id', 'flyingCard2');
-		var tgtpos;
 
+		if (data.deck == -1) {
+			if (data.player)
+				deckselect_enable(data.deckcard);
+			return;
+		}
+
+		var tgt = get_field(data.deck);
+		var tgtpos = tgt.offset();
 		var cb;
-		if (data.field2) {
+		if (tgt.data('suit') == "empty") {
 			//leaving it on the field somewhere
-			var tgt = get_field(data.field2);
-			tgtpos = tgt.offset();
-
 			cb = function() {
-				var imgname = dcc.attr('src');
-				tgt.attr('src', imgname);
-				//all attributes of the card should be set in
-				//the background
+				clear_suit(tgt);
+				set_card(tgt, data.deckcard);
 				dcc.remove();
 			}
 		} else {
-			var tgt = get_field(data.deck[0]);
-			tgtpos = tgt.offset();
-
 			tgtpos.top += 25;
 			tgtpos.left += 25;
 			cb = "void()";
 		}
-		move_card(dcc, tgtpos, cb);
+		setTimeout(function() {move_card(dcc, tgtpos, cb)}, 200);
 	}
 
 	function deck_capture() {
 		//take the card(s) from the deck and put them into captures
 		var i;
-		for (i = 0;i < data.deck.length;i++) {
-			var fc =  get_field(data.deck);
+		for (i = 0;i < data.field2.length;i++) {
+			var fc =  get_field(data.field2[i]);
 			var fcc = lift_card(fc);
 			blank_card(fc);
-			var tgt = captureDest(fcc.data('rank'), caps);
-			move_card(fcc, tgt.offset(), function() {
-					tgt.append(fcc);
+			var tgti = captureDest(fcc.data('rank'), caps);
+			move_card(fcc, tgti.offset(), function() {
+					tgti.append(fcc);
 					settle_card(fcc);});
 		}
 		var fc = $("#flyingCard2");
 		var tgt = captureDest(fc.data('rank'), caps);
-		//ewwww
 		move_card(fc, tgt.offset(), function() {
 				tgt.append(fc);
 				settle_card(fc);
 				});
 	}
-	if (do_caps1)
+	if (data.field1.length > 0)
 		setTimeout(function() {field_caps1();}, 1000);
 
 	setTimeout(function() {move_decktop();}, 1500);
-	if (data.deck) {
+
+	if (data.field2.length > 0) {
 		setTimeout(function() {deck_capture();}, 2400);
 	}
-
 }
-function update2(json) {
+function update(json) {
 	if (json.error) {
 		alert(json.error);
 		return;
 	}
-	var i;
-	anim = {hand: -1};
 
-/*	if (json.field) {
-		updateField(json.field)
-	}*/
-	/* rephrase the 'sources' data into animation data*/
-	if (json.hand) {
-		// hide cards from the player's own hand
-		for (i = 0;i < json.hand.length;i++) {
-			var idx = json.hand[i];
-			var cn = "#player_" + idx;
-			$(cn).css('display', 'none');
-		}
-	}
-
-	if (json.caps_opp) {
-		// flip the card, store the index
-		// same format as updateField
-		var oc = $("#opponent_" + json.caps_opp[0].id);
-		oc.attr('src', json.caps_opp[0].img);
-		anim.hand = json.inputs.hand;
-
-		//nasty hacky logic
-		//Basically, check the first card taken from the field is the
-		//same as the card the user selected. If it is, it was a
-		//capture. Otherwise they planted it.
-		if (json.inputs.field != json.field[0].idx) {
-			anim.field = json.field[0].idx;
-		} else {
-			anim.field = json.sources[1];
-		}
-		//suit and rank won't be needed, it's getting pushed to caps
-		
-	}
-
-	/* Sources contains most of the important information.
-	 * hand: pull from json.input
-	 * field: basically sources[1], though if nothing was captured in the
-	 *   first round it needs to be pulled from elsewhere
-	 * deck: sources[2]
-	 * field2: if sources[2] is empty field2 will be the last json.field entry
-	 */
-
-	// *** Animation work was done up to here ***
-
-	if (json.caps_self) {
-		//update own captures
-		addCaptures(json.caps_self, $("#playerCaptures"));
-	}
-
-	if (json.deck) {
-		//let the player match the deck card to a field card
-		//inactive player gets to watch, but not to act
-		$("#deckCard").attr('src', json.deck.img);
-		if (json.active) {
-			deckselect_enable(json.deck);
-		}
-	}
-	if (json.deck_clear) {
-		$("#deckCard").attr('src', "img/back.gif");
-	}
-
-	if (json.koikoi) {
-		var yakus = ""
-		for (i = 0;i < json.yaku.length;i++) {
-			yakus += json.yaku[i] + "<br />";
-		}
-		$("#txtHands").html(yakus);
-		$("#koikoiPrompt").css('display', 'block');
-		screen_on();
-	}
-
+	//small things that could be slipped into any update
 	if (json.score) {
 		$("#txtScore").text(json.score);
 	} else if (json.opp_score) {
 		$("#txtOppScore").text(json.opp_score);
 	}
-	
+
+	if (json.type == "play") {
+		update_animate(json);
+
+		if (json.koikoi) {
+			var yakus = ""
+			for (i = 0;i < json.yaku.length;i++) {
+				yakus += json.yaku[i] + "<br />";
+			}
+			$("#txtHands").html(yakus);
+			$("#koikoiPrompt").css('display', 'block');
+			screen_on();
+		}
+
+
+	}
+
 	//Results display
 	if (json.results) {
 		$("#results").html(json.results);
@@ -416,18 +396,18 @@ function update2(json) {
 		return; //don't let the comet restart
 	}
 
-
 	if (!json.active) {
 		disable_hand();
 		setTimeout("comet()", 500);
 	} else {
 		enable_hand();
 	}
+
 }
 /* General update worker function, take an update from the backend and process
  * the fields.
  */
-function update(json) {
+function update_static(json) {
 	if (json.error) {
 		alert(json.error);
 		return;
@@ -524,9 +504,7 @@ function init() {
 				if (json.hand[i].suit == -1) {
 					$(cn).css('display', 'none');
 				} else {
-					$(cn).get(0).src = json.hand[i].img;
-					$(cn).addClass(json.hand[i].suit)
-					$(cn).data('suit', json.hand[i].suit)
+					set_card($(cn), json.hand[i]);
 					$(cn).data('id', i);
 				}
 			}
@@ -534,9 +512,7 @@ function init() {
 			//field
 			for (i = 0;i < 12;i++) {
 				var cn = "#field_" + i;
-				$(cn).get(0).src = json.field[i].img;
-				$(cn).addClass(json.field[i].suit);
-				$(cn).data('suit', json.field[i].suit);
+				set_card($(cn), json.field[i]);
 				$(cn).data('id', i);
 			}
 
@@ -581,8 +557,10 @@ function init() {
 			//stop hover handler
 			unmark_field();
 			});
+	$("#deckCard").draggable({helper: 'clone',
+			disabled: true});
 
-	setTimeout(function() {update_animate({hand: 2, field: [2], deck: [1]});}, 500);
+//	setTimeout(function() {update_animate({hand: 2, field: [2], deck: [1]});}, 500);
 /*	setTimeout(function() {later();}, 1000);
 	function later() {
 		alert("Later?");
@@ -592,6 +570,8 @@ function init() {
 }
 
 function mark_field(month, blank) {
+	if (dragging || deck_select)
+		return;
 	var tgts = $(".fieldCard." + month);
 	if (tgts.length > 0)
 		tgts.addClass('cardHighlight');
@@ -611,11 +591,9 @@ function unmark_field() {
  * fieldID: ID of the card matched
  */
 function place(handID, fieldID, el) {
-	if (!get_field(fieldID).hasClass("empty")) {
-		extract_card(el);
-		clear_suit(el);
-		el.attr('id', 'flyingCard');
-	}
+	extract_card(el);
+	//clear_suit(el); // this data is still useful
+	el.attr('id', 'flyingCard');
 	if (cometactive) {
 		alert("Error, it's probably not your turn");
 		return;

@@ -55,6 +55,8 @@ class Server:
 			player = cherrypy.session['player']
 
 		return (g, player)
+	def reset_game(self):
+		self.games[cherrypy.session['game']] = game.Game(cards.create_deck(), 0)
 
 	# Threaded functions for moving updates between players
 	# Note that watch and update operate on alternate players
@@ -100,11 +102,11 @@ class Server:
 			ret = {}
 			ret['hand'] = []
 			for i, c in enumerate(g.get_hand(player)):
-				ret['hand'].append(self.update_card(i, c))
+				ret['hand'].append(self.update_card(c))
 
 			ret['field'] = []
 			for c in g.get_field():
-				ret['field'].append(self.update_card(i, c))
+				ret['field'].append(self.update_card(c))
 			
 			if g.get_player() == player:
 				ret['active'] = True
@@ -128,11 +130,12 @@ class Server:
 			return json.dumps(ret)
 
 
-	def update_card(self, idx, card):
-		ret = {'id': idx}
+	def update_card(self,card):
+		ret = {}
 		if (card == None):
 			ret['img'] = "img/empty.gif"
 			ret['suit'] = "empty"
+			ret['rank'] = -1
 		else:
 			ret['img'] = "img/" + card.image
 			ret['suit'] = "mon" + str(card.suit)
@@ -142,6 +145,7 @@ class Server:
 	@cherrypy.expose
 	def place(self, hand, field):
 		(g, player) = self.getsession()
+		p2 = 0 if player == 1 else 1
 		# sanity checks
 		try:
 			upd = g.play(player, int(hand), int(field))
@@ -150,55 +154,47 @@ class Server:
 		# Player update will be hand, field, maybe deck, captures
 		# Opponent update will be opponent, field, opponent captures
 
-		inputs = {'hand': hand, 'field': field}
-		ret = {'inputs': inputs} # local update
-		oupd = {'inputs': inputs} # other player's update
-		if len(upd['field']) > 0:
-			ret['field'] = []
-			for c in upd['field']:
-				ret['field'].append(self.update_card(c,
-					g.get_field()[c]))
-			oupd['field'] = ret['field']
-		if len(upd['hand']) > 0:
-			ret['hand'] = []
-			# it's an array, but there's really only one
-			for c in upd['hand']:
-				ret['hand'].append(c)
-				oupd['opp_hand'] = update_card(hand, c)
-		if len(upd['caps']) > 0:
-			ret['caps_self'] = []
-			for c in upd['caps']:
-				ret['caps_self'].append(self.update_card(0, c))
-			oupd['caps_opp'] = ret['caps_self']
-			ret['sources'] = oupd['sources'] = upd['sources']
-		if upd['deck']:
-			ret['deck'] = self.update_card(0, g.get_deck_top())
-			oupd['deck'] = ret['deck']
-			# Need to set up highlighting and other junk too
-		if upd['koikoi']:
-			ret['koikoi'] = True # Should set up status text too
-			scores = g.get_score(player)
-			ret['yaku'] = scores.get_names()
-			ret['score'] = scores.get_score()
-			oupd['opp_score'] = ret['score']
-		if hand == -1:
-			uopd['deck_clear'] = True
+		# Take the state changes from the game and form the AJAX request
+		
+		upd['type'] = "play"
 
+		upd['handcard'] = self.update_card(upd['handcard'])
+		upd['deckcard'] = self.update_card(upd['deckcard'])
+		upd['gameid'] = cherrypy.session['game']
+	
+		# updates to both sides
 
+		ret = upd # are these linked or copied? hrm... 
+		oupd = upd.copy()
+
+		ret['player'] = True
+		oupd['player'] = False
+
+		# This is actually to indicate whether to unlock the field - the
+		# update data is for the other player
 		if g.get_player() != player:
 			oupd['active'] = True
 		else:
 			ret['active'] = True
 
-		ret['gameid'] = oupd['gameid'] = cherrypy.session['game']
+		if upd['koikoi']:
+			ret['koikoi'] = True
+			scores = g.get_score(player)
+			ret['yaku'] = scores.get_names()
+			ret['score'] = scores.get_score()
+			oupd['opp_score'] = ret['score']
+			oupd['koikoi'] = False # Later need to replace this with
+#			a message
 
 		# If the game is over also bring up the results page
 		if g.winner != None:
 			ret['results'] = self.score(g, player)
-			p2 = 0 if player == 1 else 1
 			oupd['results'] = self.score(g, p2)
+			self.reset_game();
 
 		# Trigger the update for the other player
+		print("Player: ", ret)
+		print("Opponent: ", oupd)
 		self.set_update(oupd)
 
 		return json.dumps(ret)

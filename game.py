@@ -66,23 +66,23 @@ class Game:
 				len(self._search_field(self.hands[player][hand].suit)) > 0:
 			raise GameError("Card must match field card")
 
-		# prepare the return stuff
-		# caps is going to be weird
-		changes = {'caps': [], 'field': [], 'hand': [],
-				'deck': False, 'koikoi': False}
-		# List of the sources for various cards
-		# [0] is hand
-		# [1] is field (matched to hand) (1 or 3)
-		# deck is implied
-		# [2] is field (matched to deck)
-		changes['sources'] = [[hand], [], []]
+		changes = {'hand': [-1, -1], # hand id, field id
+				'handcard': None, # Card
+				'field1': [], # field ids
+				'deck': -1, # field id
+				'deckcard': None, # Card
+				'field2': [], # field ids
+				'koikoi': False} 
 
-		# Match the existing card
+		# playing hand card
+
+		changes['hand'] = [hand, field]
+		changes['handcard'] = self.hands[player][hand]
 		if self.field[field] == None:
+			# Placing it onto the field
 			self.field[field] = self.hands[player][hand]
-			changes['field'].append(field)
 			self.hands[player][hand] = None
-			changes['hand'].append(hand)
+			# field1 doesn't change
 		else:
 			# Actually matching something
 			# Check for 3 matching cards
@@ -92,20 +92,16 @@ class Game:
 				cap_cards = map(lambda x: self.field[x], matches)
 				cap_cards.append(self.hands[player][hand])
 				self.captures[player].extend(cap_cards)
-				changes['caps'].extend(cap_cards)
-				changes['sources'][1] = matches
+				changes['field1'] = matches
 				for x in matches:
 					self.field[x] = None
-					changes['field'].append(x)
 			else:
 				self.captures[player].extend([self.field[field], self.hands[player][hand]])
-				changes['caps'].extend([self.field[field], self.hands[player][hand]])
 				self.field[field] = None
-				changes['field'].append(field)
-				changes['sources'][1] = [field]
+				changes['field1'] = [field]
+
 
 			self.hands[player][hand] = None
-			changes['hand'].append(hand)
 			if hand == -1: # Special case, matching from the deck to
 				# the field. Don't need to draw
 				# But still do need to change player
@@ -114,36 +110,33 @@ class Game:
 
 		# Draw a card, etc.
 		card = self.cards.pop()
+		changes['deckcard'] = card
 		matches = self._search_field(card.suit)
 		if len(matches) == 0:
 			# Nothing matches, put it into the field
 			idx = self.field.index(None)
 			self.field[idx] = card
-			changes['field'].append(idx)
+			changes['deck'] = idx
 		elif len(matches) == 1:
 			# Only one match, take both cards
 			match = matches[0]
 			self.captures[player].extend([self.field[match], card])
-			changes['caps'].extend([self.field[match], card])
 			self.field[match] = None
-			changes['field'].append(match)
-			changes['sources'][2] = match
+			changes['deck'] = matches[0]
+			changes['field2'] = [match]
 		elif len(matches) == 3: # Special rule, 3 matches -> take them all
 			# If not for this the other 2 cards would be stuck on the field
 			cap_cards = map(lambda x: self.field[x], matches)
 			self.captures[player].extend(cap_cards)
-			changes['caps'].extend(cap_cards)
-			changes['sources'][2] = matches
 			for x in matches:
 				self.field[x] = None
-				changes['field'].append(x)
+			changes['field2'] = matches
 		else:
 			# More than one match, need the player to choose
 			self.deck_top = card
-			changes['deck'] = True
+			# field2 left empty, deck left as -1
 		# if deck is set the player needs to force a match, turn isn't
 		# over
-		# TODO: This will also need to check for fresh yakus
 		newyaku = self.scores[player].update(self.captures[player])
 		changes['koikoi'] = newyaku
 
@@ -153,7 +146,7 @@ class Game:
 			else:
 				self.winner = 3; # nobody
 
-		if not changes['deck'] and not newyaku:
+		if changes['deck'] != -1 and not newyaku:
 			self.player = 1 if self.player == 0 else 0
 		return changes
 
