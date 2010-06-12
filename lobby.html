@@ -1,0 +1,38 @@
+<html>
+<head>
+<title>Hanafuda Lobby</title>
+</head>
+
+<body>
+<form action="setname" method="get">
+<input type="text" name="name" value="${data['name']}" />
+<input type="submit" name="set" value="Change name" />
+</form>
+
+<p><a href="newgame">Create new game</a></p>
+
+<p>Waiting opponents:</p>
+<ul>
+% for name, link in data['games']:
+<li><a href="${link}">${name}</a></li>
+%endfor
+</ul>
+
+<p>An explanation of the rules can be found at
+<a href="http://hanafubuki.org/rules.html">www.hanafubuki.org</a>. To play a card
+drag it onto the card you wish to capture or an empty space (valid targets will
+be highlighted). Current house rules:
+
+<ul>
+<li>If a player decides to koikoi the multiplier for both players doubles. This is the only way it changes.</li>
+<li>Score is not doubled if you have over 7 points. (This and the above differ from the rules listed)</li>
+<li>Flower viewing and Moon viewing are both active</li>
+<li>The sake cup only scores as junk (dregs), not animal.</li>
+</ul>
+Rule variants may be made available later.</p>
+
+<p>The client has been tested in Firefox, Opera and Chromium (Chrome). It should work in any modern browser with
+proper javascript support.</p>
+</body>
+</html>
+

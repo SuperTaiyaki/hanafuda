@@ -41,7 +41,7 @@
 				display: none;
 				z-index: 10;
 				opacity: 0.5;}
-			div#alert {position:absolute;
+			div#alert {position:fixed;
 				width:500;
 				left:100px;
 				background-color: #BBB;
@@ -50,6 +50,10 @@
 				display:none;}
 				
 			div.capdiv {padding:5px}
+			span.button {padding-left:5em; padding-right:5em;
+				background-color: #FFF;}
+
+			#txtAlert {text-align: center;}
 
 
 			/* 620px calculated from a full hand */
@@ -58,7 +62,6 @@
 			div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
 				margin-right: -80%;}
 			div#deck {z-index: -1;}
-
 
 			img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
 			img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
@@ -70,6 +73,7 @@
 			.card {background-color: #DDD}
 			.dragging {opacity:0.5}
 		</style>
+		<title>AJAX Hanafuda</title>
 	</head>
 <body>
 
@@ -118,6 +122,7 @@
 		Multiplier: <span id="txtMultiplier">1</span>x<br />
 		Score: <span id="txtScore">0</span><br />
 		Opponent's score: <span id="txtOppScore">0</span><br />
+		Game ID: <a href="#" onclick="javascript:showLink();"><span id="txtGameId">-1</span></a><br />
 	</div>
 	<!-- middle R: scores, current multiplier, other status -->
 
@@ -141,8 +146,9 @@
 	</div>
 
 	<div id="koikoiPrompt" class="prompt" style="display:none;">
-		<p><span onclick="koikoi()">Koi</span>
-		<span onclick="endGame()">Game</span></p>
+		<p>Finish round?</p>
+		<p><span class="button" onclick="koikoi()">Koikoi</span>
+		<span class="button" onclick="endGame()">Game</span></p>
 		<p>Hands: <span id="txtHands"></span></p>
 	</div>
 

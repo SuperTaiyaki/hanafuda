@@ -1,0 +1,14 @@
+<% print c %>
+
+<div id="resultsInner" >
+	<p><strong>Result:</strong> ${c['result']}</p>
+	<p><strong>Base score:</strong> ${c['score']}</p>
+	<p><strong>Multiplier:</strong> ${c['multiplier']}</p>
+	<p><strong>Final score:</strong> ${c['finalScore']} </p>
+	<p><strong>Hands:</strong></p>
+	<ul>
+% for hand in c['hands']:
+	<li>${hand}</li>
+% endfor
+	</ul>
+</div>

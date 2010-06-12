@@ -30,6 +30,15 @@ function set_card(card, data) {
 	card.data('rank', data.rank);
 }
 
+//set a field card to an empty space
+function blank_card(card) {
+	card.attr('src', "img/empty.gif");
+	clear_suit(card);
+	card.data('rank', -1);
+	card.data('suit', 'empty');
+	card.addClass("empty");
+}
+
 /* enter deck selection mode, where there are multiple options from the field to
  * match a card from the deck. The player can only take the deck card and match
  * it to field cards of the same suit.
@@ -100,6 +109,7 @@ function disable_hand() {
 	$("#playerHand > .handCard").draggable("option", "disabled", true);
 }
 
+/* Make field cards of the matching suit into drop targets */
 function drag_targets(suit, blank) {
 	if (deck_select)
 		return; //don't bother it
@@ -111,6 +121,24 @@ function drag_targets(suit, blank) {
 		droptgts.droppable("option", "disabled", false);
 	else
 		$(".fieldCard.empty").droppable("option", "disabled", false);
+}
+
+/* Highlight field cards of the matching suit */
+function mark_field(month, blank) {
+	if (dragging || deck_select)
+		return;
+	var tgts = $("#fieldCards ." + month);
+	if (tgts.length > 0)
+		tgts.addClass('cardHighlight');
+	else if (blank)
+		$(".fieldcard.empty").addClass('cardHighlight');
+}
+/* Clear field highlights */
+function unmark_field() {
+	if (!dragging && !deck_select) {
+		$(".fieldcard.cardHighlight").removeClass('cardHighlight');
+		drag_targets("", false);
+	}
 }
 
 /* Fly el to a new location, then
@@ -142,14 +170,6 @@ function extract_card(el) {
 	return el;
 }
 
-//set a field card to an empty space
-function blank_card(card) {
-	card.attr('src', "img/empty.gif");
-	clear_suit(card);
-	card.data('rank', -1);
-	card.data('suit', 'empty');
-	card.addClass("empty");
-}
 
 function get_hand(id) {
 	return $("#player_" + id);
@@ -351,6 +371,10 @@ function update(json) {
 		$("#txtOppScore").text(json.opp_score);
 	}
 
+	if (json.multiplier) {
+		$("#txtMultiplier").text(json.multiplier);
+	}
+
 	if (json.type == "play") {
 		update_animate(json);
 
@@ -400,11 +424,17 @@ function comet() {
 	return;
 }
 
+function showLink() {
+	prompt("Give this link to your opponent:", gamelink);
+	return false;
+}
+
 function init() {
-	$.getJSON('ajax/init', function(json) {
-/*			var i;
+	$.getJSON('init', function(json) {
+			var i;
 			gameid = json.gameid;
-			$("#txtGameId").html(gameid); */
+			gamelink = json.gamelink;
+			$("#txtGameId").html(gameid);
 			//hand
 			for (i = 0;i < 8;i++) {
 				var cn = "#player_" + i;
@@ -431,6 +461,9 @@ function init() {
 				var tgt = capture_dest(json.captures_opp[i].rank, $("#opponentCaptures"));
 				tgt.append("<img src=\"" + json.captures_opp[i].img + "\" />");
 			}
+			for (i = 0;i < json.opp_hand.length;i++) {
+				get_opphand(json.opp_hand[i]).css('display', 'none');
+			}
 			$("#deckCard").data('id', -1);
 
 			$(".fieldCard").droppable({drop: function(event, ui) {
@@ -443,6 +476,8 @@ function init() {
 			if (!json.active) {
 				disable_hand();
 				setTimeout('comet()', 500); //start the comet process going
+			} else {
+				enable_hand();
 			}
 	});
 
@@ -477,21 +512,6 @@ function init() {
 			disabled: true});
 }
 
-function mark_field(month, blank) {
-	if (dragging || deck_select)
-		return;
-	var tgts = $("#fieldCards ." + month);
-	if (tgts.length > 0)
-		tgts.addClass('cardHighlight');
-	else if (blank)
-		$(".fieldcard.empty").addClass('cardHighlight');
-}
-function unmark_field() {
-	if (!dragging && !deck_select) {
-		$(".fieldcard.cardHighlight").removeClass('cardHighlight');
-		drag_targets("", false);
-	}
-}
 
 /* User took one of their cards and placed it, either on a matched card on an
  * empty space. 
@@ -526,17 +546,8 @@ function place(handID, fieldID, el, tgt) {
 	return;
 }
 
-/* After a hand has been processed update multipliers, yaku, and other stuff
- * Also allow the user to koikoi/end if appropriate
- */
-function processYaku(yaku) {
-	//multiplier
-	//yaku
-	//koikoi?
-}
-
 function koikoi() {
-	$.getJSON('ajax/koikoi', function(json) {
+	$.getJSON('koikoi', function(json) {
 			update(json);
 			//processYaku(json);
 	});
@@ -545,7 +556,7 @@ function koikoi() {
 }
 
 function endGame() {
-	$.getJSON('ajax/endgame', function(json) {
+	$.getJSON('endgame', function(json) {
 			$("#koikoiPrompt").css('display', 'none');
 			update(json);
 	});
