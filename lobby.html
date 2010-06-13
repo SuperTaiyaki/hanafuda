@@ -5,16 +5,17 @@
 
 <body>
 <form action="setname" method="get">
-<input type="text" name="name" value="${data['name']}" />
+Name: <input type="text" name="name" value="${data['name']}" />
 <input type="submit" name="set" value="Change name" />
+<input type="submit" name="random" value="New random name" />
 </form>
 
 <p><a href="newgame">Create new game</a></p>
 
 <p>Waiting opponents:</p>
 <ul>
-% for name, link in data['games']:
-<li><a href="${link}">${name}</a></li>
+% for g in data['games']:
+<li><a href="${g['link']}">${g['name']}</a></li>
 %endfor
 </ul>
 

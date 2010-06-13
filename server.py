@@ -8,10 +8,15 @@ import json
 import threading
 import time
 import random
+import Queue
+
+class GameFullException(Exception):
+	pass
 
 class Server:
 
-	def __init__(self):
+	def __init__(self, lobby):
+		self.lobby = lobby
 		self.games = {}
 		self.updates = {}
 
@@ -21,7 +26,7 @@ class Server:
 		deck = cards.create_deck()
 		buf = ""
 		for card in deck:
-			buf += "<img src=\"img/%s\" />Suit: %i Rank: %i<br />\n" % (card.image, card.suit, card.rank)
+			buf += "<img src=\"/img/%s\" />Suit: %i Rank: %i<br />\n" % (card.image, card.suit, card.rank)
 		return buf
 
 	def create_id(self):
@@ -61,6 +66,7 @@ class Server:
 			cherrypy.session['player'] = 0
 			cherrypy.session['game'] = id
 			self.init_update()
+			self.lobby.alert_create(id)
 			print("Created new game", id)
 			return (g, player)
 		# Try to join the game #id
@@ -71,9 +77,10 @@ class Server:
 			self.games[id].active_players = player + 1
 			gr = self.games[id]
 			print("Joined game ", id)
+			self.lobby.alert_join(id)
 			return (gr, player)
 
-		raise Exception("Game is full")
+		raise GameFullException("Game is full")
 
 	def reset_game(self):
 		g = game.Game(cards.create_deck(), 0)
@@ -88,22 +95,37 @@ class Server:
 		if 'game' not in cherrypy.session:
 			raise Exception("Trying initialize get updates with no game")
 		id = cherrypy.session['game']
-		self.updates[id] = [False, False]
-		self.updates[id][0] = {'lock': threading.Lock(), 'value': {}}
-		self.updates[id][1] = {'lock': threading.Lock(), 'value': {}}
-		self.updates[id][0]['lock'].acquire(False)
-		self.updates[id][1]['lock'].acquire(False)
+		self.updates[id] = [Queue.Queue(3), Queue.Queue(3)]
 
 	def watch_update(self):
 		if 'game' not in cherrypy.session:
 			raise Exception("Trying to get updates with no game")
 		id = cherrypy.session['game']
 		player = cherrypy.session['player']
-		self.updates[id][player]['lock'].acquire()
-		# When that releases there's an update ready to go
-		val = self.updates[id][player]['value']
-		self.updates[id][player]['value'] = {}
-		return val
+		q = self.updates[id][player]
+
+		# The timeout here should be _shorter_ than the one from the
+		# client. Better for this to time out (and leave the data) than
+		# for the data to be lost
+		upd = None
+		try:
+			upd = q.get(True, 240.0)
+			# FF has a short-ish timeout, this is under
+		except Queue.Empty as e:
+			return {'timeout': True}
+		q.task_done()
+		# If the connection is gone this message will be lost
+
+		# Anything else in there?
+		# Unfortunately exceptions are the only option here
+		while True:
+			try:
+				data = q.get(False)
+				upd.update(data)
+				q.task_done()
+			except Queue.Empty as e:
+				break
+		return upd
 
 	def set_update(self, upd):
 		if 'game' not in cherrypy.session:
@@ -111,11 +133,8 @@ class Server:
 		p = 0 if cherrypy.session['player'] else 1
 		id = cherrypy.session['game']
 
-		self.updates[id][p]['value'].update(upd)
-		if not self.updates[id][p]['lock'].acquire(False):
-			self.updates[id][p]['lock'].release()
-		else:
-			print("Error: Tried to release lock, but not held")
+		q = self.updates[id][p]
+		q.put_nowait(upd) # Ignore the exception - if it hits, something broke
 
 		return
 
@@ -194,11 +213,11 @@ class Server:
 	def update_card(self,card):
 		ret = {}
 		if (card == None):
-			ret['img'] = "img/empty.gif"
+			ret['img'] = "/img/empty.gif"
 			ret['suit'] = "empty"
 			ret['rank'] = -1
 		else:
-			ret['img'] = "img/" + card.image
+			ret['img'] = "/img/" + card.image
 			ret['suit'] = "mon" + str(card.suit)
 			ret['rank'] = card.rank
 		return ret
@@ -284,14 +303,14 @@ class Server:
 		return json.dumps(upd)
 
 	@cherrypy.expose
-	def board(self, id = -1):
+	def board(self, id = -1, lobby = False):
 		# Initiate the session if necessary
 		try:
 			(g, player) = self.getsession(id)
-		except e:
+		except GameFullException as e:
 			return "Error: Game is full"
 		deck = cards.create_deck()
-		deck = map(lambda x: "img/" + x.image, deck)
+		deck = map(lambda x: "/img/" + x.image, deck)
 		tmpl = Template(filename="board.html")
 		return tmpl.render(images = deck)
 
@@ -357,8 +376,8 @@ class Server:
 
 #		return tmpl.render(
 
-root = Server()
+#root = Server()
 
-cherrypy.quickstart(root, '/', 'cpconfig')
+#cherrypy.quickstart(root, '/', 'cpconfig')
 
 

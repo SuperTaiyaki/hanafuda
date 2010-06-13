@@ -32,7 +32,7 @@ function set_card(card, data) {
 
 //set a field card to an empty space
 function blank_card(card) {
-	card.attr('src', "img/empty.gif");
+	card.attr('src', "/img/empty.gif");
 	clear_suit(card);
 	card.data('rank', -1);
 	card.data('suit', 'empty');
@@ -58,7 +58,7 @@ function deckselect_enable(card) {
 
 function deckselect_disable(card) {
 	//restore the old state
-	$("#deckCard").attr('src', "img/back.gif")
+	$("#deckCard").attr('src', "/img/back.gif")
 	$("#deckCard").removeClass("cardHighlight");
 	$("#deckCard").draggable("option", "disabled", true);
 	$(".fieldCard").droppable("option", "disabled", false);
@@ -416,9 +416,25 @@ function update(json) {
 }
 
 function comet() {
+	if (cometactive)
+		return; //don't overlap requests
 	cometactive = true; //because it will block other ajax requests
+	$.ajaxSetup({
+			error: function(rq, stat, error) {
+				cometactive = false;
+				if (stat == "timeout") {
+					setTimeout("comet()", 500);
+				}
+			}});
+
+
 	$.getJSON('update', function(json) {
 			cometactive = false;
+			if (json.timeout) {
+				//timed out on the other end, try again
+				setTimeout("comet()", 500);
+				return;
+			}
 			update(json);
 		});
 	return;
