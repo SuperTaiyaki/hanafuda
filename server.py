@@ -125,6 +125,11 @@ class Server:
 			gr = self.games[id]
 			print("Joined game ", id)
 			self.lobby.alert_join(id)
+
+			upd = {'start_game': True}
+			if gr.get_player() != player:
+				upd['active'] = True
+			self.set_update(upd)
 			return (gr, player)
 
 		raise GameFullException("Game is full")
@@ -193,11 +198,15 @@ class Server:
 			if c == None:
 				ret['opp_hand'].append(i)
 
-		if g.get_player() == player:
-			ret['active'] = True
+
 
 		ret['gameid'] = cherrypy.session['game']
 		ret['gamelink'] = cherrypy.request.base + "/play/board?id=" + str(ret['gameid'])
+	
+		if g.get_player() == player:
+			ret['active'] = True
+		if g.active_players == 2:
+			ret['start_game'] = True
 
 		# This should set up deckselect or koikoi too. maybe.
 
@@ -344,7 +353,6 @@ class Server:
 		deck = map(lambda x: "/img/" + x.image, deck)
 		tmpl = Template(filename="board.html")
 		return tmpl.render(images = deck)
-
 
 	@cherrypy.expose
 	def debug(self, args):

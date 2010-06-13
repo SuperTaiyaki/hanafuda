@@ -1,3 +1,6 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
 <html>
 	<head>
 		<!-- include all the relevant JS -->
@@ -37,17 +40,22 @@
 			div#screen {position:fixed;
 				width:100%;
 				height:100%;
+				top: 0;
+				left: 0;
 				background-color: #999;
-				display: none;
 				z-index: 10;
-				opacity: 0.5;}
+				opacity: 0.5;
+				display: none;}
 			div#alert {position:fixed;
-				width:500;
+				width:500px;
 				left:100px;
 				background-color: #BBB;
 				top:0px;
 				height:50px;
-				display:none;}
+				border: 3px solid black;
+				z-index: 100;
+				text-align: center;
+				display: none;}
 				
 			div.capdiv {padding:5px}
 			span.button {padding-left:5em; padding-right:5em;
@@ -67,7 +75,7 @@
 			img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
 				z-index: 5;}
 			img.deckCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
-			img.capCard {margin-right: -20px}
+			img.capCard {margin-right: -30px}
 			.cardHighlight {background-color: #807575 !important}
 			.handDisabled {background-color: #888}
 			.card {background-color: #DDD}
@@ -157,7 +165,7 @@
 	<div id="screen">
 	</div>
 	<div id="alert" class="alert">
-		<span id="txtAlert"></span>
+		<span id="txtAlert">Waiting for opponent</span>
 	</div>
 <!-- Firefox is a bit brain-dead, if images aren't preloaded stuff doesn't work
 right -->

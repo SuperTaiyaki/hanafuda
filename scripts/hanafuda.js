@@ -116,7 +116,7 @@ function drag_targets(suit, blank) {
 	$(".fieldCard").droppable("option", "disabled", true);
 	if (suit == "")
 		return;
-	var droptgts = $(".fieldcard." + suit);
+	var droptgts = $(".fieldCard." + suit);
 	if (droptgts.length > 0)
 		droptgts.droppable("option", "disabled", false);
 	else
@@ -131,12 +131,12 @@ function mark_field(month, blank) {
 	if (tgts.length > 0)
 		tgts.addClass('cardHighlight');
 	else if (blank)
-		$(".fieldcard.empty").addClass('cardHighlight');
+		$(".fieldCard.empty").addClass('cardHighlight');
 }
 /* Clear field highlights */
 function unmark_field() {
 	if (!dragging && !deck_select) {
-		$(".fieldcard.cardHighlight").removeClass('cardHighlight');
+		$(".fieldCard.cardHighlight").removeClass('cardHighlight');
 		drag_targets("", false);
 	}
 }
@@ -359,9 +359,16 @@ function update_animate(data) {
 	}
 }
 function update(json) {
+	if (!json) {
+		alert("Connection to server lost.");
+		return;
+	}
 	if (json.error) {
 		alert(json.error);
 		return;
+	}
+	if (json.start_game) {
+		start_game();
 	}
 
 	//small things that could be slipped into any update
@@ -422,7 +429,6 @@ function comet() {
 		return; //don't overlap requests
 	cometactive = true; //because it will block other ajax requests
 	$.ajaxSetup({
-			timeout: 8000,
 			error: function(rq, stat, error) {
 				cometactive = false;
 				if (stat == "timeout") {
@@ -451,6 +457,11 @@ function showLink() {
 	return false;
 }
 
+function start_game() {
+	$("#alert").slideUp('fast');
+	$("#screen").fadeOut(100);
+	return;
+}
 function init() {
 	$.getJSON('init', function(json) {
 			var i;
@@ -494,12 +505,21 @@ function init() {
 					},
 					'disabled': true});
 
-			//dealer?
-			if (!json.active) {
-				disable_hand();
-				setTimeout('comet()', 500); //start the comet process going
+			if (!json.start_game) {
+				$("#screen").css('display', 'block');
+				$("#alert").css('display', 'block');
 			} else {
-				enable_hand();
+				//dealer?
+				start_game();
+				if (!json.active) {
+					disable_hand();
+				} else {
+					enable_hand();
+				}
+			}
+
+			if (!json.active || !json.start_game) {
+				setTimeout('comet()', 500);
 			}
 	});
 
