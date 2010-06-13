@@ -13,6 +13,53 @@ import Queue
 class GameFullException(Exception):
 	pass
 
+class SyncQueue():
+	def __init__(self, timeout = 240.0):
+		self.queue = []
+		self.ready = threading.Event()
+		self.q_lock = threading.Lock()
+		self.queue_id = 100
+		self.timeout = timeout
+	def _lock(self):
+		self.q_lock.acquire()
+	def _unlock(self):
+		# Should make sure the lock is held...
+		self.q_lock.release()
+	def ack(self, id):
+		self._lock()
+		if len(self.queue) and self.queue[0]['queue_id'] == int(id):
+			del self.queue[0]
+		if len(self.queue) == 0:
+			self.ready.clear()
+		self._unlock()
+	def add(self, data):
+		self._lock()
+		data['queue_id'] = self.queue_id
+		self.queue_id += 1
+		self.queue.append(data)
+		self.ready.set()
+		self._unlock()
+	def get(self):
+		# Not strictly correct, the queue could empty between the time
+		# the event triggers and the lock is acquired. If the wait
+		# succeeds the lock should be acquired automatically to prevent
+		# this... requires a different sort of event mechanism.
+
+		# The correct mechanism will have a timeout and the ability to
+		# wake multiple listeners at once. multiprocessing.lock() and
+		# multiprocessing.semaphore() do have timeouts.
+
+		# the lock releases and 
+		self.ready.wait(self.timeout)
+		self._lock()
+		if len(self.queue) > 0:
+			ret = self.queue[0]
+			self._unlock()
+			return self.queue[0]
+		else:
+			self._unlock()
+			return {'timeout': True} # Don't want to use exceptions
+
 class Server:
 
 	def __init__(self, lobby):
@@ -87,15 +134,14 @@ class Server:
 		g.active_players = 0
 		self.games[cherrypy.session['game']] = g
 
-
-	# Threaded functions for moving updates between players
-	# Note that watch and update operate on alternate players
+	def init_queue(self):
+		return [SyncQueue(), SyncQueue()]
 
 	def init_update(self):
 		if 'game' not in cherrypy.session:
 			raise Exception("Trying initialize get updates with no game")
 		id = cherrypy.session['game']
-		self.updates[id] = [Queue.Queue(3), Queue.Queue(3)]
+		self.updates[id] = [SyncQueue(), SyncQueue()]
 
 	def watch_update(self):
 		if 'game' not in cherrypy.session:
@@ -103,40 +149,24 @@ class Server:
 		id = cherrypy.session['game']
 		player = cherrypy.session['player']
 		q = self.updates[id][player]
+		return q.get()
 
-		# The timeout here should be _shorter_ than the one from the
-		# client. Better for this to time out (and leave the data) than
-		# for the data to be lost
-		upd = None
-		try:
-			upd = q.get(True, 240.0)
-			# FF has a short-ish timeout, this is under
-		except Queue.Empty as e:
-			return {'timeout': True}
-		q.task_done()
-		# If the connection is gone this message will be lost
-
-		# Anything else in there?
-		# Unfortunately exceptions are the only option here
-		while True:
-			try:
-				data = q.get(False)
-				upd.update(data)
-				q.task_done()
-			except Queue.Empty as e:
-				break
-		return upd
 
 	def set_update(self, upd):
 		if 'game' not in cherrypy.session:
 			raise Exception("Trying to get updates with no game")
 		p = 0 if cherrypy.session['player'] else 1
 		id = cherrypy.session['game']
-
 		q = self.updates[id][p]
-		q.put_nowait(upd) # Ignore the exception - if it hits, something broke
-
+		q.add(upd)
 		return
+	def ack_update(self, key):
+		if 'game' not in cherrypy.session:
+			raise Exception("Trying to get updates with no game")
+		id = cherrypy.session['game']
+		player = cherrypy.session['player']
+		q = self.updates[id][player]
+		q.ack(key)
 
 	@cherrypy.expose
 	def init(self):
@@ -167,7 +197,7 @@ class Server:
 			ret['active'] = True
 
 		ret['gameid'] = cherrypy.session['game']
-		ret['gamelink'] = cherrypy.request.base + "/board?id=" + str(ret['gameid'])
+		ret['gamelink'] = cherrypy.request.base + "/play/board?id=" + str(ret['gameid'])
 
 		# This should set up deckselect or koikoi too. maybe.
 
@@ -297,8 +327,9 @@ class Server:
 		return tmpl.render(c = ctx)
 
 	@cherrypy.expose
-	def update(self):
+	def update(self, key):
 		# Polling method, let the client know if anything can be updated
+		self.ack_update(key)
 		upd = self.watch_update()
 		return json.dumps(upd)
 

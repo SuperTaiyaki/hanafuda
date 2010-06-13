@@ -415,11 +415,14 @@ function update(json) {
 
 }
 
+//cometkey is used to acknowledge receipt of an update
+cometkey = 0;
 function comet() {
 	if (cometactive)
 		return; //don't overlap requests
 	cometactive = true; //because it will block other ajax requests
 	$.ajaxSetup({
+			timeout: 8000,
 			error: function(rq, stat, error) {
 				cometactive = false;
 				if (stat == "timeout") {
@@ -428,12 +431,15 @@ function comet() {
 			}});
 
 
-	$.getJSON('update', function(json) {
+	$.getJSON('update?key=' + cometkey, function(json) {
 			cometactive = false;
-			if (json.timeout) {
+			if (json.timeout || json.queue_id <= cometkey) {
 				//timed out on the other end, try again
 				setTimeout("comet()", 500);
 				return;
+			}
+			if (json.queue_id) {
+				cometkey = json.queue_id;
 			}
 			update(json);
 		});
