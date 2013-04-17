@@ -38,6 +38,7 @@ class Game:
 		self.player = dealer
 		self.active_players = 0
 		
+		#self.koikoi = [False, False]
 		self.multiplier = 1
 		self.winner = None
 
@@ -157,6 +158,7 @@ class Game:
 				for x in matches:
 					self.field[x] = None
 				changes['field2'] = matches
+				changes['deck'] = matches[0]
 			else:
 				# More than one match, need the player to choose
 				self.deck_top = card
@@ -190,7 +192,7 @@ class Game:
 			#raise GameError("Illegal move")
 			self.can_end = -1
 			return False
-		self.multiplier *= 2
+		self.koikoi[self.player] = True
 		self.player = 1 if self.player == 0 else 0
 		return True
 	

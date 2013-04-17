@@ -13,7 +13,7 @@ Name: <input type="text" name="name" value="${data['name']}" />
 <input type="submit" name="random" value="New random name" />
 </form>
 
-<p><a href="newgame">Create new game</a></p>
+<p><a href="/new_game">Create new game</a></p>
 
 <p>Waiting opponents:</p>
 <ul>
@@ -29,9 +29,10 @@ be highlighted). Current house rules:
 
 <ul>
 <li>If a player decides to koikoi the multiplier for both players doubles. This is the only way it changes.</li>
-<li>Score is not doubled if you have over 7 points. (This and the above differ from the rules listed)</li>
-<li>Flower viewing and Moon viewing are both active</li>
+<li>Score is not doubled if you have over 7 points.</li>
+<li>Flower viewing and Moon viewing are both active.</li>
 <li>The sake cup only scores as junk (dregs), not animal.</li>
+<li>Special draws don't score. They're silently re-drawn in the background.</li>
 </ul>
 Rule variants may be made available later.</p>
 

@@ -64,118 +64,97 @@ class Server:
 
 	def __init__(self, lobby):
 		self.lobby = lobby
-		self.games = {}
 		self.updates = {}
+		self.deck = cards.create_deck()
 
-	# Test function that spits out a list of images
-	@cherrypy.expose
-	def showcards(self):
-		deck = cards.create_deck()
-		buf = ""
-		for card in deck:
-			buf += "<img src=\"/img/%s\" />Suit: %i Rank: %i<br />\n" % (card.image, card.suit, card.rank)
-		return buf
-
-	def create_id(self):
-		ti = 0
-		while True:
-			ti = random.randrange(11111111, 99999999)
-			if ti not in self.games:
-				break
-		return ti
+	def create_game(self, options = None):
+		# Err, no options for now...
+		g = game.Game(self.deck)
+		return {'game': g, 'locks': self.init_queue()}
 
 	# id, active game: join
 	# no id active session: reuse
 	# id, inactive game: create
 	# no id, no session: create
 	
-	def getsession(self, id = -1):
+	def getsession(self):
 		# time.sleep(1.4)
-		id = int(id)
 
-		if 'game' in cherrypy.session and (id == -1 or id == cherrypy.session['game']):
-			g = self.games[cherrypy.session['game']]
-			player = cherrypy.session['player']
-			return (g, player)
-
-		if id == -1:
-			if 'game' in cherrypy.session:
-				id = cherrypy.session['game']
-			else:
-				id = self.create_id()
-
-		if id not in self.games:
-			# start a new game
-			g = game.Game(cards.create_deck(), 0)
-			self.games[id] = (g)
-			g.active_players = 1
-			player = 0
-			cherrypy.session['player'] = 0
-			cherrypy.session['game'] = id
-			self.init_update()
-			self.lobby.alert_create(id)
-			print("Created new game", id)
-			return (g, player)
-		# Try to join the game #id
-		if self.games[id] and self.games[id].active_players < 2:
-			player = self.games[id].active_players
-			cherrypy.session['player'] = player
-			cherrypy.session['game'] = id 
-			self.games[id].active_players = player + 1
-			gr = self.games[id]
-			print("Joined game ", id)
-			self.lobby.alert_join(id)
-
-			upd = {'start_game': True}
-			if gr.get_player() != player:
-				upd['active'] = True
-			self.set_update(upd)
-			return (gr, player)
-
-		raise GameFullException("Game is full")
-
-	def reset_game(self):
-		g = game.Game(cards.create_deck(), 0)
-		g.active_players = 0
-		self.games[cherrypy.session['game']] = g
-
+		return (self.lobby.get_game()['game'], self.lobby.get_player())
+#		id = int(id)
+#
+#		if 'game' in cherrypy.session and (id == -1 or id == cherrypy.session['game']):
+#			g = self.games[cherrypy.session['game']]
+#			player = cherrypy.session['player']
+#			return (g, player)
+#
+#		if id == -1:
+#			if 'game' in cherrypy.session:
+#				id = cherrypy.session['game']
+#			else:
+#				id = self.create_id()
+#
+#		if id not in self.games:
+#			# start a new game
+#			g = game.Game(cards.create_deck(), 0)
+#			self.games[id] = g
+#			g.active_players = 1
+#			player = 0
+#			cherrypy.session['player'] = 0
+#			cherrypy.session['game'] = id
+#			self.init_update()
+#			self.lobby.alert_create(id)
+#			print("Created new game", id)
+#			return (g, player)
+#		# Try to join the game #id
+#		if self.games[id] and self.games[id].active_players < 2:
+#			player = self.games[id].active_players
+#			cherrypy.session['player'] = player
+#			cherrypy.session['game'] = id 
+#			self.games[id].active_players = player + 1
+#			gr = self.games[id]
+#			print("Joined game ", id)
+#			self.lobby.alert_join(id)
+#
+#			upd = {'start_game': True}
+#			if gr.get_player() != player:
+#				upd['active'] = True
+#			self.set_update(upd)
+#			return (gr, player)
+#
+#		raise GameFullException("Game is full")
+	
 	def init_queue(self):
 		return [SyncQueue(), SyncQueue()]
 
-	def init_update(self):
-		if 'game' not in cherrypy.session:
-			raise Exception("Trying initialize get updates with no game")
-		id = cherrypy.session['game']
-		self.updates[id] = [SyncQueue(), SyncQueue()]
+	def get_queue(self, own = True):
+		sess = self.lobby.get_game()
+		player = self.lobby.get_player()
+
+		if not own:
+			player = (player + 1) % 2
+		return sess['locks'][player]
 
 	def watch_update(self):
-		if 'game' not in cherrypy.session:
-			raise Exception("Trying to get updates with no game")
-		id = cherrypy.session['game']
-		player = cherrypy.session['player']
-		q = self.updates[id][player]
+		q = self.get_queue(True)
 		return q.get()
-
-
 	def set_update(self, upd):
-		if 'game' not in cherrypy.session:
-			raise Exception("Trying to get updates with no game")
-		p = 0 if cherrypy.session['player'] else 1
-		id = cherrypy.session['game']
-		q = self.updates[id][p]
+		q = self.get_queue(False)
 		q.add(upd)
-		return
 	def ack_update(self, key):
-		if 'game' not in cherrypy.session:
-			raise Exception("Trying to get updates with no game")
-		id = cherrypy.session['game']
-		player = cherrypy.session['player']
-		q = self.updates[id][player]
+		q = self.get_queue(True)
 		q.ack(key)
 
 	@cherrypy.expose
 	def init(self):
 		(g, player) = self.getsession()
+
+		if player == 1:
+			upd = {'start_game': True}
+			if g.get_player() != player:
+				upd['active'] = True
+			self.set_update(upd)
+
 		ret = {}
 		ret['hand'] = []
 		for i, c in enumerate(g.get_hand(player)):
@@ -198,14 +177,11 @@ class Server:
 			if c == None:
 				ret['opp_hand'].append(i)
 
-
-
-		ret['gameid'] = cherrypy.session['game']
-		ret['gamelink'] = cherrypy.request.base + "/play/board?id=" + str(ret['gameid'])
+		ret['gamelink'] = self.lobby.join_link()
 	
 		if g.get_player() == player:
 			ret['active'] = True
-		if g.active_players == 2:
+		if player == 1:
 			ret['start_game'] = True
 
 		# This should set up deckselect or koikoi too. maybe.
@@ -227,8 +203,9 @@ class Server:
 		alert  = "Opponent did not koikoi.<br />"
 		alert += "Multiplier is now %ix" % g.multiplier
 
-		self.set_update({'active': True, 'alert': alert})
-		return json.dumps({})
+		self.set_update({'active': True, 'alert': alert,
+			'multiplier': g.multiplier})
+		return json.dumps({'multiplier': g.multiplier})
 
 	@cherrypy.expose
 	def endgame(self, arg):
@@ -281,7 +258,7 @@ class Server:
 
 		upd['handcard'] = self.update_card(upd['handcard'])
 		upd['deckcard'] = self.update_card(upd['deckcard'])
-		upd['gameid'] = cherrypy.session['game']
+		upd['gameid'] = cherrypy.session['game_id']
 	
 		# updates to both sides
 
@@ -290,6 +267,9 @@ class Server:
 
 		ret['player'] = True
 		oupd['player'] = False
+
+		if upd['deck'] == -1: # Deck select
+			ret['alert'] = "Deck card matches multiple cards on the field. Select one."
 
 		# This is actually to indicate whether to unlock the field - the
 		# update data is for the other player
@@ -307,7 +287,6 @@ class Server:
 			oupd['koikoi'] = False # Later need to replace this with
 			oupd['alert'] = "Opponent deciding whether to koikoi"
 			oupd['multiplier'] = ret['multiplier'] = g.multiplier
-#			a message
 
 		# If the game is over also bring up the results page
 		if g.winner != None:
@@ -346,11 +325,10 @@ class Server:
 	def board(self, id = -1, lobby = False):
 		# Initiate the session if necessary
 		try:
-			(g, player) = self.getsession(id)
+			(g, player) = self.getsession()
 		except GameFullException as e:
 			return "Error: Game is full"
-		deck = cards.create_deck()
-		deck = map(lambda x: "/img/" + x.image, deck)
+		deck = map(lambda x: "/img/" + x.image, self.deck)
 		tmpl = Template(filename="board.html")
 		return tmpl.render(images = deck)
 
@@ -361,7 +339,7 @@ class Server:
 			g.winner = player
 			return "Set winner"
 		elif args == "koikoi":
-			c = cards.Card("jan1.gif", 1)
+			c = cards.Card("jan1.gif", 0)
 			c.attrs['bright'] = True
 			c.rank = 20
 			l = len(filter(lambda x: 'bright' in x.attrs,
@@ -374,10 +352,10 @@ class Server:
 			g.cards.append(cards.Card("jan3.gif", 0))
 			return "Next play will require card select (maybe)"
 		elif args == "take3":
-			g.field[0] = cards.Card("jan1.gif", 1)
-			g.field[1] = cards.Card("jan2.gif", 1)
-			g.field[2] = cards.Card("jan3.gif", 1)
-			g.hands[player][0] = cards.Card("jan4.gif", 1)
+			g.field[0] = cards.Card("jan1.gif", 0)
+			g.field[1] = cards.Card("jan2.gif", 0)
+			g.field[2] = cards.Card("jan3.gif", 0)
+			g.hands[player][0] = cards.Card("jan4.gif", 0)
 			return "Next play will take 3 cards from the field"
 		elif args == "status":
 			output = "Field: "
@@ -397,8 +375,12 @@ class Server:
 			for c in g.hands[1]:
 				output += img(c)
 			return output
-
-
+		elif args == "showcards":
+			deck = cards.create_deck()
+			buf = ""
+			for card in deck:
+				buf += "<img src=\"/img/%s\" />Suit: %i Rank: %i<br />\n" % (card.image, card.suit, card.rank)
+			return buf
 		else:
 			return "Invalid argument"
 
