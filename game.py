@@ -1,233 +1,297 @@
 import cards
 import random
+import cPickle
+
+# This thing is genius
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
 
 class GameError(Exception):
-	pass
+    pass
+
+States = enum(
+    'PLAY', # Regular, expecting play()
+    'DRAW_MATCH', # Drew a card -> multiple on-field matches, expecting ___()
+    'KOIKOI', # Completed a yaku, expecting koikoi() or end()
+    'FINISHED')
+
+Events = enum(
+    'CAPTURE', # list of field IDs
+    'DRAW', # To indicate what was on top of the deck (card id)
+    'DRAW_CAP', # list of field IDs
+    'DRAW_PLACE', # Field ID
+    )
 
 class Game:
-	FIELD_SIZE = 12 # maximum possible
-	# Dealer should be 0 or 1
-	def __init__(self, deck, dealer = -1):
-		# Actually not an ideal shuffle according to the docs
-		# take the first 3 slices of 8 cards to make the hands and field
-		self.cards = deck[:]
-		def draw():
-			random.shuffle(self.cards)
-			self.hands = (self.cards[0:8], self.cards[8:16])
-			self.captures = ([], [])
-			self.scores = (cards.Scoring(), cards.Scoring())
-			self.field = self.cards[16:24]
+    """ Class used to operate a game.
+    Initialize to a new game state with new_game().
 
-		draw()
-		while (cards.win_hand(self.hands[0])[0] or
-			cards.win_hand(self.hands[1])[0] or
-			cards.bad_field(self.field)[0]):
-			draw()
+    Check active player with get_player()
+    Check state with get_state()
+    If state is PLAY:
+        -respond with play_card.
+        -> Extra draw will take place automatically. 
+            -> If player must choose which field card to match with the draw,
+                state will become DRAW_MATCH on return
+            -> If not, koikoi check will occur. State either goes to PLAY (other player)
+                or KOIKOI
+        -> Player changes, state is back to PLAY.
 
-		# Pad up to FIELD_SIZE with Nones
-		self.field.extend([None] * (self.FIELD_SIZE - len(self.field)))
+    If state is DRAW_MATCH:
+        -respond with draw_match
+        -> Koikoi check will occur. State either goes back to PLAY or KOIKOI.
+    If state is KOIKOI:
+        -respond with koikoi
+        -> If yes, state becomes PLAY player changes.
+        -> If no, game ends.
 
-		self.cards = self.cards[24:]
+    """
+    FIELD_SIZE = 12 # maximum possible
+    # Dealer should be 0 or 1
+    def __init__(self):
+        pass
 
-		self.deck_top = None
-		self.can_end = -1
+    def new_game(self, dealer = -1):
+        # Actually not an ideal shuffle according to the docs
+        # take the first 3 slices of 8 cards to make the hands and field
+        self.cards = range(48)
+        self.captures = ([], [])
+#        self.scores = (cards.Scoring(), cards.Scoring())
+        def draw():
+            random.shuffle(self.cards)
+            self.hands = (self.cards[0:8], self.cards[8:16])
+            self.field = self.cards[16:24]
 
-		if (dealer == -1):
-			dealer = random.randint(0, 1)
-		self.dealer = dealer
-		self.player = dealer
-		self.active_players = 0
-		
-		#self.koikoi = [False, False]
-		self.multiplier = 1
-		self.winner = None
+        draw()
+        while (cards.win_hand(self.hands[0])[0] or
+            cards.win_hand(self.hands[1])[0] or
+            cards.bad_field(self.field)[0]):
+            draw()
 
-	def get_player(self):
-		return self.player
-	
-	def get_hand(self, player):
-		return self.hands[player]
+        # Pad up to FIELD_SIZE with Nones
+        self.field.extend([None] * (self.FIELD_SIZE - len(self.field)))
 
-	def get_captures(self, player):
-		return self.captures[player]
+        self.cards = self.cards[24:]
 
-	def get_field(self):
-		return self.field
-	def get_deck_top(self):
-		return self.deck_top
+        self.deck_top = None
 
-	def play(self, player, hand, field):
-		self.can_end = -1
-		if player != self.player:
-			raise GameError("Not your turn")
-		if hand != -1 and self.hands[player][hand] == None:
-			print ("Error Hand: ", self.hands[player])
-			raise GameError("Invalid card (inconsistent state, try refreshing)")
-		if hand != -1 and self.field[field] != None and self.field[field].suit != self.hands[player][hand].suit:
-			raise GameError("Suits don't match (inconsistent state, try refreshing)")
-		if hand == -1 and self.deck_top.suit != self.field[field].suit:
-			raise GameError("Suits don't match (inconsistent state, try refreshing)")
-			# exception, trying to match the deck suit to
-			# something random
-		if field not in range(0, 12):
-			print("Weird Field: %i" % field)
-			raise GameError("Invalid field location (wtf did you do?)")
-		# Player trying to not match when matches exist
-		if self.field[field] == None and \
-				len(self._search_field(self.hands[player][hand].suit)) > 0:
-			raise GameError("Card must be matched to a field card (possibly inconsistent state, try refreshing)")
+        self.state = States.PLAY
 
-		changes = {'hand': [-1, -1], # hand id, field id
-				'handcard': None, # Card
-				'field1': [], # field ids
-				'deck': -1, # field id
-				'deckcard': None, # Card
-				'field2': [], # field ids
-				'koikoi': False} 
+        if (dealer == -1):
+            dealer = random.randint(0, 1)
+        self.player = dealer
 
-		# playing hand card
+        self.koikoi = [0, 0]
+        self.scores = [0, 0] # Needed to check if there's a koikoi option
+        self.multiplier = 1
+        self.winner = None
 
-		# If hand is -1 the field argument is the card that the deck
-		# card matched to
-		changes['hand'] = [hand, field]
+        # Write-only.
+        self.self_captures = []
+        self.deck_captures = []
+        self.deck_draw = None
 
-		if hand != -1:
-			changes['handcard'] = self.hands[player][hand]
-		if self.field[field] == None and hand != -1:
-			# Placing it onto the field
-			self.field[field] = self.hands[player][hand]
-			self.hands[player][hand] = None
-			# field1 doesn't change
-		else:
-			# Actually matching something
-			# Check for 3 matching cards
-			matches = (self._search_field(self.hands[player][hand].suit) if
-					hand != -1 else [])
-			if (len(matches) == 3):
-				# hand can't be -1 - if there were 3 matches
-				# they would have been taken automatically
-				cap_cards = map(lambda x: self.field[x], matches)
-				cap_cards.append(self.hands[player][hand])
-				self.captures[player].extend(cap_cards)
-				changes['field1'] = matches
-				for x in matches:
-					self.field[x] = None
-			elif hand == -1:
-				self.captures[player].extend([self.field[field],self.deck_top])
-				self.deck_top = None
-				self.field[field] = None
-				changes['field'] = [field]
-			else:
-				self.captures[player].extend([self.field[field], self.hands[player][hand]])
-				self.field[field] = None
-				changes['field1'] = [field]
-			 
-			# Special case, matching from the deck to
-			# the field.
-			if hand != -1:
-				# Don't delete the tail of the hand
-				self.hands[player][hand] = None
-			else:
-				# Indicate it's a partial update
-				changes['deck'] = -2
-				changes['field1'] = [field]
+    def event(self, type, data):
+        self.events.append(type, data)
 
-		# if hand is -1 the player is matching the deck card to
-		# something - don't draw again
-		if hand != -1:
-			# Draw a card, etc.
-			card = self.cards.pop()
-			changes['deckcard'] = card
-			matches = self._search_field(card.suit)
-			if len(matches) == 0:
-				# Nothing matches, put it into the field
-				idx = self.field.index(None)
-				self.field[idx] = card
-				changes['deck'] = idx
-			elif len(matches) == 1:
-				# Only one match, take both cards
-				match = matches[0]
-				self.captures[player].extend([self.field[match], card])
-				self.field[match] = None
-				changes['deck'] = matches[0]
-				changes['field2'] = [match]
-			elif len(matches) == 3: # Special rule, 3 matches -> take them all
-				# If not for this the other 2 cards would be stuck on the field
-				cap_cards = map(lambda x: self.field[x], matches)
-				self.captures[player].extend(cap_cards)
-				for x in matches:
-					self.field[x] = None
-				changes['field2'] = matches
-				changes['deck'] = matches[0]
-			else:
-				# More than one match, need the player to choose
-				self.deck_top = card
-				# field2 left empty, deck left as -1
-			# if deck is set the player needs to force a match, turn isn't
-			# over
+    @classmethod
+    def load(state):
+        self.hands = state['hands']
+        self.captures = state['deck']
+        self.deck = state['deck']
+        self.koikoi = state['koikoi']
+        self.player = state['player']
+        self.state = state['state']
+        self.deck_top = state['deck_top']
+        # Calculate scores
 
-		# Don't try to calculate scoring if the player needs to match
-		newyaku = False
-		if changes['deck'] != -1:
-			newyaku = self.scores[player].update(self.captures[player])
-			changes['koikoi'] = newyaku
-			if newyaku :
-				self.can_end = player
+    def dump():
+        ret = {}
+        # Only the important parts of the game state
+        ret['hands'] = self.hands
+        ret['captures'] = self.captures
+        ret['deck'] = self.deck
+        ret['koikoi'] = self.koikoi
+        ret['player'] = self.player
+        ret['state'] = self.state
+        ret['deck_top'] = self.deck_top
+        # Should store a version key in here or something...
+        return ret
 
-		# out of cards. If there's a yaku, win the round; if not the
-		# dealer, continue; otherwise draw
-		if not any(self.hands[player]) and changes['deck'] != -1:
-			if newyaku:
-				self.winner = player
-				changes['koikoi'] = False
-			elif self.player != self.dealer:
-				self.winner = 3 # nobody
+    def get_player(self):
+        return self.player
 
-		if changes['deck'] != -1 and not newyaku:
-			self.player = 1 if self.player == 0 else 0
-		return changes
+    def get_state(self):
+        return self.state
 
-	def koikoi(self):
-		if self.can_end != self.player:
-			#raise GameError("Illegal move")
-			self.can_end = -1
-			return False
-		self.koikoi[self.player] = True
-		self.player = 1 if self.player == 0 else 0
-		return True
-	
-	def end(self, player):
-		if self.can_end != self.player:
-			#raise GameError("Illegal move")
-			self.can_end = -1
-			return False
-		self.winner = player
-		return True
+    def get_hand(self, player):
+        return self.hands[player]
 
-	def get_score(self, player):
-		return self.scores[player]
-		
+    def get_captures(self, player):
+        return self.captures[player]
 
-	def _search_field(self, suit):
-		res = []
-		for idx, val in enumerate(self.field):
-			if not val:
-				continue
-			if val.suit == suit:
-				res.append(idx)
-		return res
+    def get_last_captures():
+        return (self.self_captures, self.draw_captures)
+
+    def get_field(self):
+        return self.field
+    def get_deck_top(self):
+        return self.deck_top
+
+    def _take_card(self, player, hand, field):
+        if self.field[field] is None:
+            raise GameError("Tried to place card on something; broken!")
+        if self.hands[player][hand] / 4 != self.field[field] / 4:
+            raise GameError("Suits don't match (inconsistent state, try refreshing)")
+
+        # Special case: if there are 3 cards of the same suit on the field, take them all
+        matches = self._search_field(self.hands[player][hand])
+        if (len(matches) == 3):
+            # Could just as easily compute this is card/4+0, +1, +2, +3
+            cap_cards = [self.field[x] for x in matches]
+            self.captures[player].extend(cap_cards)
+            for card in matches:
+                self.field[card] = None
+        else:
+            cap_cards.append(self.field[field])
+            self.field[field] = None
+
+        self.self_captures.extend(matches)
+
+        cap_cards.append(self.hands[player][hand])
+        self.hands[player][hand] = None
+
+    def _place_card(self, player, hand, field):
+        if self.field[field] != None:
+            raise GameError("Tried to place card on something; broken!")
+        self.field[field] = self.hands[player][hand]
+        self.hands[player][hand] = None
+
+    def play_card(self, player, hand, field):
+        """ Player has dealt something.
+        player is the player index (1 or 0, should match self.player)
+        hand is the index of the card in the hand
+        field is the index of the field space. If there's a card there,
+            it's a capture. If not, the card is being placed.
+        """
+
+        del self.self_captures[0:]
+        del self.draw_captures[0:]
+ 
+        if self.field[field] is None:
+            self._place_card(player, hand, field)
+        else:
+            self._take_card(self, player, hand, field)
+
+        self.deck_draw(self, player)
+        # TODO: Koikoi check, etc.
+
+        return
+
+    def deck_draw(self, player):
+        card = self.cards.pop()
+        self.deck_draw = card
+        matches = self._search_field(card)
+
+        if len(matches) == 0:
+            # Nothing matches, put it into the field
+            # Hrmmmmm, if the field is full this will explode
+            idx = self.field.index(None)
+            self.field[idx] = card
+            self.event(Events.DRAW_PLACE, idx)
+        elif len(matches) == 1:
+            # Only one match, take both cards
+            match = matches[0]
+            self.captures[player].extend([self.field[match], card])
+            self.field[match] = None
+            self.draw_matches.extend(matches)
+        elif len(matches) == 3: # Special rule, 3 matches -> take them all
+            # If not for this the other 2 cards would be stuck on the field
+            cap_cards = [self.field[x] for x in matches]
+            self.captures[player].extend(cap_cards)
+            self.captures[player].append(card)
+            for x in matches:
+                self.field[x] = None
+            self.draw_matches.extend(matches)
+        else:
+            # Two matches, need the player to choose
+            self.deck_top = card
+            self.state = States.DRAW_MATCH
+            return # Not ending the turn yet!
+
+        self.end_turn()
+
+    def validate_input(self, player, field):
+        if player != self.player:
+            raise GameError("Incorrect player. Not your turn.")
+        if field < 0 or field > 11:
+            raise GameError("Invalid field location (wtf did you do?)")
+
+    # Drawn card has multiple matches on-field -> player has selected one
+    def draw_match(self, player, field):
+        """ Indicate the card that the player will match against the card
+        from the top of the deck."""
+        if self.state != States.DRAW_MATCH:
+            raise GameError("Not currently a valid move.")
+        if self.deck_top / 4 != self.field[field] / 4:
+            raise GameError("Suits don't match (inconsistent state, try refreshing)")
+
+        self.captures[player].extend([self.field[field],self.deck_top])
+        self.deck_top = None
+        self.field[field] = None
+        self.end_turn()
+
+    def koikoi(self, player, koikoi):
+        """ Indicate whether the player will koikoi. True/False. """
+        if self.state != States.KOIKOI:
+            raise GameError("Unable to koikoi at this point.")
+        if player != self.player:
+            raise GameError("Wrong player.")
+
+        if koikoi:
+            self.koikoi[self.player] += 1
+            end_turn()
+            return False
+        else:
+            self.winner = player
+            self.state = States.FINISHED
+            return True
+
+    def get_score(self, player):
+        return self.scores[player]
+
+    def end_turn():
+        # TODO: Yaku check goes here... maybe. koikoi() needs to use part of this...
+        self.player = 1 if self.player == 0 else 0
+        self.states = States.PLAY
+
+    def _search_field(self, suit):
+        res = []
+        for idx, card in enumerate(field):
+            if self._same_suit(suit, card):
+                res.append(idx)
+        return res
+
+    @staticmethod
+    def _same_suit(c1, c2):
+        return c1 / 4 == c2 / 4
 
 def test():
-	g = Game(cards.create_deck())
-	print("Hand 0:")
-	print g.hand(0)
-	print("Hand 1:")
-	print g.hand(1)
-	print ("Field:")
-	print g.get_field()
-	
-def itest():
-	return Game(cards.create_deck(), 0)
+    g = Game()
+    print("Hand 0:")
+    print g.hands[0]
+    print("Hand 1:")
+    print g.hands[1]
+    print ("Field:")
+    print g.get_field()
 
-#test()
+    print cPickle.dumps(g)
+
+def itest():
+    return Game(cards.create_deck(), 0)
+
+# Formal unit tests for this live elsewhere
+if __name__ == '__main__':
+    test()
 

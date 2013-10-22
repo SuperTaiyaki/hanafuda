@@ -199,7 +199,7 @@ function update_animate(data) {
 	var el = 0;
 	var caps = data.player ? $("#playerCaptures") : $("#opponentCaptures");
 	var time = 0;
-		
+
 	if (!data.player) {
 		if (data.deck == -2) {
 			el = $("#flyingCard");
@@ -268,6 +268,7 @@ function update_animate(data) {
 			settle_card(container, card);};
 	}
 
+    // Fly all the field cards of one suit to the captures pile
 	function field_caps1() {
 		//move flyingCard and field[data.field1[]] to captures
 		var i;
@@ -363,6 +364,28 @@ function update(json) {
 		alert("Connection to server lost.");
 		return;
 	}
+
+    /* EXPERIMENTAL NON-WORKING NEW CODE */
+    // iterate events etc.
+    // evt[0]: event type
+    // evt[1]: player
+    if (evt[0] == "play_card" && evt[1] == 0) {
+        // Card is about to fly
+    }
+    if (evt[0] == "place_card" && evt[1] == 0) {
+        // Plant it
+    }
+    if (evt[0] == "take_card") {
+        // Lift cards in evt[2]
+        // Fly to evt[1]'s capture pile
+        // Also fly whatever's floated
+    }
+    if (evt[0] == "deck_draw") {
+        // Show card on the deck
+    }
+
+    /* OLD CODE RESUMES HERE */
+
 	if (json.error) {
 		alert(json.error);
 		return;
