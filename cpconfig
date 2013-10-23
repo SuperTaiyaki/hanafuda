@@ -10,4 +10,7 @@ tools.staticdir.dir: 'img'
 [/scripts]
 tools.staticdir.on: True
 tools.staticdir.dir: 'scripts'
-
+#[/ws]
+#tools.websocket.on: True
+#tools.websocket.handler_cls: EWS
+# Websocket can't be done here because the class names don't resolve right

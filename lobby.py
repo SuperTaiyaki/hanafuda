@@ -3,8 +3,12 @@ import random
 import cherrypy
 import server
 
+from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+from ws4py.websocket import WebSocket
 
-class GameManager:
+from ws4py.websocket import EchoWebSocket
+
+class GameManager(object):
     """Handles a single set of rounds """
     # Options:
     # rounds: 3, 6, 12
@@ -23,7 +27,7 @@ class GameManager:
         # Spawn the new game with the correct dealer
 
 
-class SessionManager:
+class SessionManager(object):
     """ Handles individual users and games, times them out due to
     inactivity.
     """
@@ -52,9 +56,10 @@ class SessionManager:
 def get_lobby():
     return root
 
-class Lobby:
+class Lobby(object):
     def __init__(self):
         self.tmpl = Template(filename="lobby.html")
+        self.list_tpl = Template(filename="gamelist.tpl")
         self.waiting = {} # Need to make sure this doesn't build up...
         self.games = {}
         f = open("namelist")
@@ -86,14 +91,24 @@ class Lobby:
             cherrypy.session['name'] = name
         raise cherrypy.HTTPRedirect("/")
 
+    def gamelist_render(self):
+        games = []
+        for id,name in self.waiting.iteritems():
+            games.append({
+                'name': name,
+                'link': "/join_game?id=%i" % id})
+        return self.list_tpl.render(gamelist = games)
+
+    def game_alert(self):
+        gamelist = self.gamelist_render()
+        for l in listeners:
+            l.send(gamelist) if l else '' # Might have become None
+
     @cherrypy.expose
     def default(self):
         sess = self.getsession()
-        data = {'name': sess['name'], 'games': []}
-        for id,name in self.waiting.iteritems():
-            data['games'].append({
-                'name': name,
-                'link': "/join_game?id=%i" % id})
+        data = {'name': sess['name']}
+        data['gamelist'] = self.gamelist_render()
         return self.tmpl.render(data = data)
 
     @cherrypy.expose
@@ -109,6 +124,9 @@ class Lobby:
         if lobby and 'name' in cherrypy.session:
             self.waiting[id] = cherrypy.session['name']
         self.games[id] = g
+
+        self.game_alert()
+
         raise cherrypy.HTTPRedirect("/play/board")
 
     @cherrypy.expose
@@ -124,6 +142,11 @@ class Lobby:
         # in case of a new round both players will join
         cherrypy.session['game_id'] = id
         raise cherrypy.HTTPRedirect("/play/board")
+
+    @cherrypy.expose
+    def ws(self):
+        pass
+        # handler = cherrypy.request.ws_handler
     
     # Return the link to join the game
     def join_link(self):
@@ -137,12 +160,45 @@ class Lobby:
                 break
         return ti
 
+listeners = []
+
+class EWS(WebSocket):
+    def received_message(self, message):
+        print("Received message")
+        print("message")
+        self.send(message.data, message.is_binary)
+    def opened(self):
+        print("WS Connection opened")
+        listeners.append(self)
+    def notify(self, data):
+        self.send(json.dumps(data), False)
+        print("Added listener")
+    def closed(self, code, reason = None):
+        listeners.remove(self)
+        print("Removed listener")
+
 root = Lobby()
 server = server.Server(root)
 
 root.play = server
 
-cherrypy.server.shutdown_timeout = 10
-cherrypy.quickstart(root, '/', 'cpconfig')
+WebSocketPlugin(cherrypy.engine).subscribe()
+cherrypy.tools.websocket = WebSocketTool() 
 
+# This doesn't work for some reason - 
+#wsconfig = {'/': {'tools.websocket.on': True,
+#        'tools.websocket.handler_cls': EWS}}
+#cherrypy.tree.mount(root, '/ws', wsconfig)
 
+cherrypy.server.shutdown_timeout = 0
+#cherrypy.quickstart(root, '/', 'cpconfig')
+
+cherrypy.config.update({'tools.sessions.on': True,
+    'tool.staticdir.root': '/home/rek/code/hanafuda'})
+cherrypy.quickstart(root, '/', {'/ws': {
+    'tools.websocket.on': True,
+    'tools.websocket.handler_cls': EWS},
+    '/scripts': {
+        'tools.staticdir.on': True,
+        'tools.staticdir.dir': '/home/rek/code/hanafuda/scripts'}})
+# Websocket weirdness... reassemble this correctly later

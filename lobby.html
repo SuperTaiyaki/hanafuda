@@ -4,6 +4,30 @@
 <html>
 <head>
 <title>Hanafuda Lobby</title>
+<script type="text/javascript" src="/scripts/jquery.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+if (!'WebSocket' in window) {
+    alert("No websocket support. Not going to work.");
+}
+
+var wsconn = new WebSocket("ws://localhost:8080/ws");
+
+wsconn.onopen = function() {
+}
+wsconn.onmessage = function(data) {
+    // alert("WS Message: " + data.data);
+    $("#gamelist").html(data.data);
+}
+wsconn.onclose = function() {
+    alert("Server connection lost.");
+}
+wsconn.onerror = function(err) {
+    alert("WebSocket error");
+    }
+});
+
+</script>
 </head>
 
 <body>
@@ -16,11 +40,11 @@ Name: <input type="text" name="name" value="${data['name']}" />
 <p><a href="/new_game">Create new game</a></p>
 
 <p>Waiting opponents:</p>
-<ul>
-% for g in data['games']:
-<li><a href="${g['link']}">${g['name']}</a></li>
-%endfor
+<div>
+<ul id="gamelist">
+${data['gamelist']}
 </ul>
+</div>
 
 <p>An explanation of the rules can be found at
 <a href="http://hanafubuki.org/rules.html">www.hanafubuki.org</a>. To play a card
