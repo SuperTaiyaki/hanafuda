@@ -1,12 +1,15 @@
-from mako.template import Template
 import random
-import cherrypy
-import server
+import json
 
+from mako.template import Template
+
+import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
-from ws4py.websocket import EchoWebSocket
+import server
+import cards
+
 
 class GameManager(object):
     """Handles a single set of rounds """
@@ -57,9 +60,11 @@ def get_lobby():
     return root
 
 class Lobby(object):
+    board_tmpl = Template(filename="board.html")
+    tmpl = Template(filename="lobby.html")
+    list_tpl = Template(filename="gamelist.tpl")
+
     def __init__(self):
-        self.tmpl = Template(filename="lobby.html")
-        self.list_tpl = Template(filename="gamelist.tpl")
         self.waiting = {} # Need to make sure this doesn't build up...
         self.games = {}
         f = open("namelist")
@@ -68,7 +73,7 @@ class Lobby(object):
 
     def generate_name(self):
         return random.choice(self.names)
-    
+
     def initsession(self):
         cherrypy.session['name'] = self.generate_name()
 
@@ -113,13 +118,15 @@ class Lobby(object):
 
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
-        g = server.create_game() # global var
-        cherrypy.session['game'] = g
-        cherrypy.session['player'] = 0
+
         if id == None or id in self.games:
             id = self.create_id()
         else:
             id = int(id)
+
+        g = server.Server(self, id)
+        cherrypy.session['game'] = g
+        cherrypy.session['player'] = 0
         cherrypy.session['game_id'] = id
         if lobby and 'name' in cherrypy.session:
             self.waiting[id] = cherrypy.session['name']
@@ -127,7 +134,7 @@ class Lobby(object):
 
         self.game_alert()
 
-        raise cherrypy.HTTPRedirect("/play/board")
+        raise cherrypy.HTTPRedirect("/board")
 
     @cherrypy.expose
     def join_game(self, id):
@@ -141,16 +148,27 @@ class Lobby(object):
         # should be checking g.active_players
         # in case of a new round both players will join
         cherrypy.session['game_id'] = id
-        raise cherrypy.HTTPRedirect("/play/board")
+        raise cherrypy.HTTPRedirect("/board")
+
+    def connect_client(self, pipe, id, player):
+        if id not in self.games:
+            return None
+        game = self.games[id]
+        game.connect(player, pipe)
+        return self.games[id]
 
     @cherrypy.expose
     def ws(self):
         pass
         # handler = cherrypy.request.ws_handler
+
+    @cherrypy.expose
+    def play_ws(self):
+        pass
     
     # Return the link to join the game
-    def join_link(self):
-        return cherrypy.request.base + "/join_game?id=%i" % cherrypy.session['game_id']
+    def join_link(self, gameid):
+        return cherrypy.request.base + "/join_game?id=%i" % gameid
 
     def create_id(self):
         ti = 0
@@ -159,6 +177,15 @@ class Lobby(object):
             if ti not in self.games:
                 break
         return ti
+
+    @cherrypy.expose
+    def board(self):
+        if 'game' not in cherrypy.session:
+            return 'Error: No active game'
+        deck = ['/img/' + x.image for x in cards.DECK]
+        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'],
+                player = cherrypy.session['player'])
+
 
 listeners = []
 
@@ -177,10 +204,27 @@ class EWS(WebSocket):
         listeners.remove(self)
         print("Removed listener")
 
-root = Lobby()
-server = server.Server(root)
 
-root.play = server
+class GameWS(WebSocket):
+    def __init__(self, *args, **kwargs):
+        super(GameWS, self).__init__(*args, **kwargs)
+        self.game = None
+    def received_message(self, message):
+        print(message.data)
+        data = json.loads(message.data)
+        if self.game is None:
+            # Get a hold of the dispatcher
+            self.game = get_lobby().connect_client(self, data['game_id'], data['player'])
+            self.player = data['player']
+        else:
+            self.game.message(self.player, data)
+    def opened(self):
+        pass
+    def closed(self, code, reason = None):
+        pass
+
+
+root = Lobby()
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool() 
@@ -195,10 +239,18 @@ cherrypy.server.shutdown_timeout = 0
 
 cherrypy.config.update({'tools.sessions.on': True,
     'tool.staticdir.root': '/home/rek/code/hanafuda'})
-cherrypy.quickstart(root, '/', {'/ws': {
-    'tools.websocket.on': True,
-    'tools.websocket.handler_cls': EWS},
+cherrypy.quickstart(root, '/', {
+    '/ws': {
+        'tools.websocket.on': True,
+        'tools.websocket.handler_cls': EWS},
+    '/play_ws': {
+        'tools.websocket.on': True,
+        'tools.websocket.handler_cls': GameWS},
+
     '/scripts': {
         'tools.staticdir.on': True,
-        'tools.staticdir.dir': '/home/rek/code/hanafuda/scripts'}})
+        'tools.staticdir.dir': '/home/rek/code/hanafuda/scripts'},
+    '/img': {
+        'tools.staticdir.on': True,
+        'tools.staticdir.dir': '/home/rek/code/hanafuda/img'}})
 # Websocket weirdness... reassemble this correctly later

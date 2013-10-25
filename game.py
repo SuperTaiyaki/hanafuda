@@ -88,16 +88,16 @@ class Game:
         self.winner = None
 
         # Write-only.
-        self.self_captures = []
-        self.deck_captures = []
-        self.deck_draw = None
+        self.events = []
 
-    def event(self, type, data):
-        self.events.append(type, data)
+    def event(self, type, player = None, card = None, location = None):
+        #self.events.append((type, player, card, location))
+        self.events.append({'type': type, 'player': player, 'card': card, 'location': location})
 
     @classmethod
     def load(state):
         self.hands = state['hands']
+        self.field = state['field']
         self.captures = state['deck']
         self.deck = state['deck']
         self.koikoi = state['koikoi']
@@ -110,6 +110,7 @@ class Game:
         ret = {}
         # Only the important parts of the game state
         ret['hands'] = self.hands
+        ret['field'] = self.field
         ret['captures'] = self.captures
         ret['deck'] = self.deck
         ret['koikoi'] = self.koikoi
@@ -139,6 +140,9 @@ class Game:
     def get_deck_top(self):
         return self.deck_top
 
+    def get_events(self):
+        return self.events
+
     def _take_card(self, player, hand, field):
         if self.field[field] is None:
             raise GameError("Tried to place card on something; broken!")
@@ -154,8 +158,9 @@ class Game:
             for card in matches:
                 self.field[card] = None
         else:
-            cap_cards.append(self.field[field])
+            cap_cards = [self.field[field]]
             self.field[field] = None
+        self.event("take_card", player, cap_cards, matches + [-1])
 
         self.self_captures.extend(matches)
 
@@ -176,22 +181,23 @@ class Game:
             it's a capture. If not, the card is being placed.
         """
 
-        del self.self_captures[0:]
-        del self.draw_captures[0:]
- 
+        # TODO: validation goes in here
+
+        self.event("play_card", player, self.field[field], field)
+
         if self.field[field] is None:
             self._place_card(player, hand, field)
         else:
-            self._take_card(self, player, hand, field)
+            self._take_card(player, hand, field)
 
-        self.deck_draw(self, player)
+        self.deck_draw(player)
         # TODO: Koikoi check, etc.
 
         return
 
     def deck_draw(self, player):
         card = self.cards.pop()
-        self.deck_draw = card
+        self.event("draw_card", player, card, [])
         matches = self._search_field(card)
 
         if len(matches) == 0:
@@ -199,28 +205,29 @@ class Game:
             # Hrmmmmm, if the field is full this will explode
             idx = self.field.index(None)
             self.field[idx] = card
-            self.event(Events.DRAW_PLACE, idx)
+            self.event("draw_place", player, card, idx)
         elif len(matches) == 1:
             # Only one match, take both cards
             match = matches[0]
             self.captures[player].extend([self.field[match], card])
+            self.event("draw_capture", player, matches, [self.field[match]])
             self.field[match] = None
-            self.draw_matches.extend(matches)
         elif len(matches) == 3: # Special rule, 3 matches -> take them all
             # If not for this the other 2 cards would be stuck on the field
             cap_cards = [self.field[x] for x in matches]
+            self.event("draw_capture", player, matches, cap_cards)
             self.captures[player].extend(cap_cards)
             self.captures[player].append(card)
             for x in matches:
                 self.field[x] = None
-            self.draw_matches.extend(matches)
         else:
             # Two matches, need the player to choose
             self.deck_top = card
             self.state = States.DRAW_MATCH
+            self.event(":draw_match", player, [], card)
             return # Not ending the turn yet!
 
-        self.end_turn()
+        self.end_turn(player)
 
     def validate_input(self, player, field):
         if player != self.player:
@@ -239,8 +246,9 @@ class Game:
 
         self.captures[player].extend([self.field[field],self.deck_top])
         self.deck_top = None
+        self.event("draw_capture", player, [field], [self.field[field]])
         self.field[field] = None
-        self.end_turn()
+        self.end_turn(player)
 
     def koikoi(self, player, koikoi):
         """ Indicate whether the player will koikoi. True/False. """
@@ -251,25 +259,28 @@ class Game:
 
         if koikoi:
             self.koikoi[self.player] += 1
-            end_turn()
+            self.event("koikoi", player, [], [])
+            end_turn(player)
             return False
         else:
             self.winner = player
             self.state = States.FINISHED
+            self.event("end", player, [], [])
             return True
 
     def get_score(self, player):
         return self.scores[player]
 
-    def end_turn():
+    def end_turn(self, player):
         # TODO: Yaku check goes here... maybe. koikoi() needs to use part of this...
         self.player = 1 if self.player == 0 else 0
         self.states = States.PLAY
+        self.event("end_turn", player, [], [])
 
     def _search_field(self, suit):
         res = []
-        for idx, card in enumerate(field):
-            if self._same_suit(suit, card):
+        for idx, card in enumerate(self.field):
+            if card is not None and self._same_suit(suit, card):
                 res.append(idx)
         return res
 

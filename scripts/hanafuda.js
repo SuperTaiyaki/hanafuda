@@ -4,13 +4,12 @@
 var dragging = false;
 var deck_select = false;
 var cometactive = false;
-var gameid;
 
 function log(msg) {
 	//opera-specific JS debugging
 	window.opera.postError(msg);
 }
-
+// {{{ Animation/graphical stuff
 // Strip all suits off a card
 function clear_suit(el) {
 	var i;
@@ -182,6 +181,32 @@ function get_opphand(id) {
 }
 function get_deckcard() {
 	return $("#deckCard");
+}
+// }}}
+
+function opponent_place_card(hand, field) {
+    var el = extract_card(get_opphand(data.hand[0]));
+    set_card(el, data.handcard);
+    el.attr('id', 'flyingCard');
+    if (dest.data('suit') != "empty") {
+        tgt = dest.offset();
+        tgt.top += 25;
+        tgt.left += 25;
+        cb = "void()";
+    } else {
+        tgt = dest.offset();
+        cb = function() {
+            //don't actually replace the element, that kills
+            //the attributes
+            var c = {img: el.attr('src'),
+                suit: el.data("suit"),
+                rank: el.data("rank")};
+            clear_suit(dest);
+            set_card(dest, c);
+            el.remove();
+        }
+    }
+    move_card(el, tgt, cb);
 }
 
 function update_animate(data) {
@@ -359,32 +384,13 @@ function update_animate(data) {
 		setTimeout(function() {deck_capture();}, time);
 	}
 }
+
+/*
 function update(json) {
 	if (!json) {
 		alert("Connection to server lost.");
 		return;
 	}
-
-    /* EXPERIMENTAL NON-WORKING NEW CODE */
-    // iterate events etc.
-    // evt[0]: event type
-    // evt[1]: player
-    if (evt[0] == "play_card" && evt[1] == 0) {
-        // Card is about to fly
-    }
-    if (evt[0] == "place_card" && evt[1] == 0) {
-        // Plant it
-    }
-    if (evt[0] == "take_card") {
-        // Lift cards in evt[2]
-        // Fly to evt[1]'s capture pile
-        // Also fly whatever's floated
-    }
-    if (evt[0] == "deck_draw") {
-        // Show card on the deck
-    }
-
-    /* OLD CODE RESUMES HERE */
 
 	if (json.error) {
 		alert(json.error);
@@ -444,36 +450,7 @@ function update(json) {
 	}
 
 }
-
-//cometkey is used to acknowledge receipt of an update
-cometkey = 0;
-function comet() {
-	if (cometactive)
-		return; //don't overlap requests
-	cometactive = true; //because it will block other ajax requests
-	$.ajaxSetup({
-			error: function(rq, stat, error) {
-				cometactive = false;
-				if (stat == "timeout") {
-					setTimeout("comet()", 500);
-				}
-			}});
-
-
-	$.getJSON('update?key=' + cometkey, function(json) {
-			cometactive = false;
-			if (json.timeout || json.queue_id <= cometkey) {
-				//timed out on the other end, try again
-				setTimeout("comet()", 500);
-				return;
-			}
-			if (json.queue_id) {
-				cometkey = json.queue_id;
-			}
-			update(json);
-		});
-	return;
-}
+*/
 
 function showLink() {
 	prompt("Give this link to your opponent:", gamelink);
@@ -485,68 +462,107 @@ function start_game() {
 	$("#screen").fadeOut(100);
 	return;
 }
+
+function run_event(data) {
+    switch(data.type) {
+        case 'init':
+            board_init(data);
+            break;
+        case 'game_start':
+            start_game();
+            break;
+        // Hand -> Field
+        case 'play_card':
+            if (data.player != player_id) {
+                opponent_place_card(data.hand, data.field);
+            }
+
+            break;
+
+        default:
+            alert("Unknown message: " + data.type);
+    }
+
+}
+
+function ws_init() {
+    wsock = new WebSocket('ws://localhost:8080/play_ws');
+    wsock.onopen = function() {
+        var data = new Object;
+        data.type = 'client_connect';
+        data.game_id = gameid;
+        data.player = playerid;
+        wsock.send(JSON.stringify(data));
+    };
+    wsock.onmessage = function(evt) {
+        var data = JSON.parse(evt.data);
+        for (var i = 0;i < data.length;i++) {
+            run_event(data[i]);
+        }
+    };
+}
+
+function board_init(state) {
+    var i;
+    gamelink = state.gamelink;
+    $("#txtGameId").html(gameid);
+    //hand
+    for (i = 0;i < 8;i++) {
+        var cn = "#player_" + i;
+        if (state.hand[i].rank == -1) {
+            $(cn).css('display', 'none');
+        } else {
+            set_card($(cn), state.hand[i]);
+            $(cn).data('id', i);
+        }
+    }
+
+    //field
+    for (i = 0;i < 12;i++) {
+        var cn = "#field_" + i;
+        set_card($(cn), state.field[i]);
+        $(cn).data('id', i);
+    }
+
+    for (i = 0;i < state.captures_player.length;i++) {
+        var tgt = capture_dest(state.captures_player[i].rank, $("#playerCaptures"));
+        tgt.append("<img src=\"" + state.captures_player[i].img + "\" />");
+    }
+    for (i = 0;i < state.captures_opp.length;i++) {
+        var tgt = capture_dest(state.captures_opp[i].rank, $("#opponentCaptures"));
+        tgt.append("<img src=\"" + state.captures_opp[i].img + "\" />");
+    }
+    for (i = 0;i < state.opp_hand.length;i++) {
+        get_opphand(state.opp_hand[i]).css('display', 'none');
+    }
+
+    $("#screen").css('display', 'block');
+    $("#alert").css('display', 'block');
+    disable_hand();
+
+    if (!state.game_started) {
+        $("#screen").css('display', 'block');
+        $("#alert").css('display', 'block');
+    }
+    if (!state.active) {
+        disable_hand();
+    } else {
+        enable_hand();
+    }
+}
+
+/* Set up the initial board. Easier to do this via AJAX than to populate the inital HTML */
 function init() {
-	$.getJSON('init', function(json) {
-			var i;
-			gameid = json.gameid;
-			gamelink = json.gamelink;
-			$("#txtGameId").html(gameid);
-			//hand
-			for (i = 0;i < 8;i++) {
-				var cn = "#player_" + i;
-				if (json.hand[i].rank == -1) {
-					$(cn).css('display', 'none');
-				} else {
-					set_card($(cn), json.hand[i]);
-					$(cn).data('id', i);
-				}
-			}
+    ws_init()
 
-			//field
-			for (i = 0;i < 12;i++) {
-				var cn = "#field_" + i;
-				set_card($(cn), json.field[i]);
-				$(cn).data('id', i);
-			}
+    $("#deckCard").data('id', -1);
 
-			for (i = 0;i < json.captures_player.length;i++) {
-				var tgt = capture_dest(json.captures_player[i].rank, $("#playerCaptures"));
-				tgt.append("<img src=\"" + json.captures_player[i].img + "\" />");
-			}
-			for (i = 0;i < json.captures_opp.length;i++) {
-				var tgt = capture_dest(json.captures_opp[i].rank, $("#opponentCaptures"));
-				tgt.append("<img src=\"" + json.captures_opp[i].img + "\" />");
-			}
-			for (i = 0;i < json.opp_hand.length;i++) {
-				get_opphand(json.opp_hand[i]).css('display', 'none');
-			}
-			$("#deckCard").data('id', -1);
+    $(".fieldCard").droppable({drop: function(event, ui) {
+            place(ui.draggable.data("id"), $(this).data("id"),
+            ui.draggable, ui.position);
+            },
+            'disabled': true});
 
-			$(".fieldCard").droppable({drop: function(event, ui) {
-					place(ui.draggable.data("id"), $(this).data("id"),
-						ui.draggable, ui.position);
-					},
-					'disabled': true});
-
-			if (!json.start_game) {
-				$("#screen").css('display', 'block');
-				$("#alert").css('display', 'block');
-			} else {
-				//dealer?
-				start_game();
-				if (!json.active) {
-					disable_hand();
-				} else {
-					enable_hand();
-				}
-			}
-
-			if (!json.active || !json.start_game) {
-				setTimeout('comet()', 500);
-			}
-	});
-
-	
 	/* handle dragging and hovering cards
 	 * On hover highlight the cards that match the highlighted card
 	 * On drag lock the highlight
@@ -604,10 +620,12 @@ function place(handID, fieldID, el, tgt) {
 		deckselect_disable();
 	}
 
-	$.getJSON('place', {hand: handID, field: fieldID}, function(json) {
-			update(json);
+    var data = {};
+    data['type'] = 'place';
+    data['hand'] = handID;
+    data['field'] = fieldID;
+    wsock.send(JSON.stringify(data));
 
-	});
 	return;
 }
 
