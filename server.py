@@ -127,8 +127,15 @@ class Server(object):
         events_other = []
 
         for event in self.game.get_events():
+            print(event)
+            if event['card'] is not None:
+                print event['type']
+                print event['card']
+                event['card'] = self.update_card(event['card'])
             events_self.append((event))
             events_other.append((event))
+
+        self.game.clear_events()
 
         if self.game.state == game.States.DRAW_MATCH:
             events_self.append({'type': 'alert','text': "Deck card matches multiple cards on the field. Select one."})
@@ -138,7 +145,7 @@ class Server(object):
             pass # Uhh...
         else: # Other player
             events_self.append({'type': 'turn_end'})
-            events_other.append({'type': 'turn_start'})
+            events_other.append({'type': 'start_turn'})
 
         self.send_messages(player, json.dumps(events_self), json.dumps(events_other))
 

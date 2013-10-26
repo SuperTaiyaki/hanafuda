@@ -210,7 +210,7 @@ class GameWS(WebSocket):
         super(GameWS, self).__init__(*args, **kwargs)
         self.game = None
     def received_message(self, message):
-        print(message.data)
+        print("MESSAGE: " + message.data)
         data = json.loads(message.data)
         if self.game is None:
             # Get a hold of the dispatcher
