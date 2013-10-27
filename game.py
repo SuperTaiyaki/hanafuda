@@ -222,7 +222,7 @@ class Game:
             # Two matches, need the player to choose
             self.deck_top = card
             self.state = States.DRAW_MATCH
-            self.event(":draw_match", player, None, card)
+            self.event(":draw_match", player, card, None)
             return # Not ending the turn yet!
 
         self.end_turn(player)

@@ -7,7 +7,7 @@ var cometactive = false;
 
 function log(msg) {
     //opera-specific JS debugging
-    window.opera.postError(msg);
+    console.log(msg);
 }
 // {{{ Animation/graphical stuff
 // Strip all suits off a card
@@ -139,12 +139,51 @@ function unmark_field() {
     }
 }
 
+animation_queue = [];
+animation_frame = [];
+animating = false; // Really don't like trying to block this way...
+
+function animate_next() {
+    if (animation_queue.length == 0) {
+        animating = false;
+        return;
+    }
+    animating = true;
+    //alert("Animating");
+
+    events = animation_queue.shift();
+    for (var i = 0;i < events.length;i++) {
+        events[i]();
+    }
+
+    setTimeout(function() {animate_next();}, 1000);
+}
+
+function animate_gate() {
+    if (animation_frame.length == 0) {
+        return;
+    }
+
+    var run = (animation_queue.length == 0);
+    animation_queue.push(animation_frame);
+    console.log("Animation push:");
+    console.log(animation_frame);
+    animation_frame = [];
+    if (run && !animating) {
+        animate_next();
+    }
+}
+
 /* Fly el to a new location, then
  * call the callback.
  */
 function move_card(el, target, callback) {
-    el.animate(target, 'fast', 'swing', callback);
+    animation_frame.push(function() {
+        el.animate(target, 'fast', 'swing', callback);
+    });
 }
+
+
 /* Clone an element but overlay it onto the original */
 function lift_card(el) {
     var pos = el.offset();
@@ -184,7 +223,6 @@ function get_deckcard() {
 opponent_play_order = [];
 
 function opponent_place_card(field, card) {
-    // TODO: Randomly pick a card from opponent's hand
     var hand = opponent_play_order.pop();
     var el = extract_card(get_opphand(hand));
     set_card(el, card);
@@ -192,15 +230,22 @@ function opponent_place_card(field, card) {
     var dest = get_field(field);
 
     var tgt = dest.offset();
-    cb = function() {
-        //don't actually replace the element, that kills
-        //the attributes
-        var c = {img: el.attr('src'),
-            suit: el.data("suit"),
-            rank: el.data("rank")};
-        clear_suit(dest);
-        set_card(dest, c);
-        el.remove();
+
+    if (dest.data('suit') === 'empty') {
+        cb = function() {
+            //don't actually replace the element, that kills
+            //the attributes
+            var c = {img: el.attr('src'),
+                suit: el.data("suit"),
+                rank: el.data("rank")};
+            clear_suit(dest);
+            set_card(dest, c);
+            el.remove();
+        }
+    } else {
+        tgt.top += 25;
+        tgt.left += 25;
+        cb = "void()";
     }
     move_card(el, tgt, cb);
 }
@@ -219,23 +264,24 @@ function opponent_fly_card(location, card) {
     move_card(el, tgt);
 }
 
-function capture_cards(locations, player) {
-    //function to make a class sit in the captures pile
-    function settle_card(container, card) {
-        container.append(card);
-        card.css('position', 'static');
-        card.attr('id', '');
-        card.removeClass().addClass("card capCard");
-        //card.draggable("option", "disabled", true);
-    }
-    //get around annoying JS not-really-closures
-    function make_settlecard(container, card) {
-        return function() {
-            settle_card(container, card);};
-    }
+//function to make a class sit in the captures pile
+function settle_card(container, card) {
+    container.append(card);
+    card.css('position', 'static');
+    card.attr('id', '');
+    card.removeClass().addClass("card capCard");
+    //card.draggable("option", "disabled", true);
+}
+//get around annoying JS not-really-closures
+function make_settlecard(container, card) {
+    return function() {
+        settle_card(container, card);};
+}
 
+function capture_cards(locations, player) {
     //move flyingCard and field[data.field1[]] to captures
     var caps = player === playerid ? $("#playerCaptures") : $("#opponentCaptures");
+
     var i;
     for (i = 0;i < locations.length;i++) {
         var fc = get_field(locations[i]);
@@ -246,9 +292,12 @@ function capture_cards(locations, player) {
 
         move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc, i));
     }
-    var fc = $("#flyingCard2");
-    var tgt = capture_dest(fc.data('rank'), caps);
-    move_card(fc, tgt.offset(), make_settlecard(tgt, fc));
+}
+
+function capture_single(card, player) {
+    var caps = player === playerid ? $("#playerCaptures") : $("#opponentCaptures");
+    var tgt = capture_dest(card.data('rank'), caps);
+    move_card(card, tgt.offset(), make_settlecard(tgt, card));
 }
 
 function self_place_card(field) {
@@ -302,7 +351,7 @@ function deck_place(location, card) {
         set_card(tgt, card);
         dcc.remove();
     }
-    setTimeout(function() {move_card(dcc, tgtpos, cb)}, 200);
+    move_card(dcc, tgtpos, cb);
 
 }
 
@@ -313,8 +362,11 @@ function deck_capture(locations, player) {
     var tgt_pos = target.offset();
     tgt_pos.top += 25;
     tgt_pos.left += 25;
+//    dcc.attr('id', 'flyingCard');
 
-    setTimeout(function() {move_card(dcc, tgt_pos)}, 200);
+    move_card(dcc, tgt_pos);
+    animate_gate();
+    capture_single(dcc, player);
 
     // Take all the captures
     capture_cards(locations, player);
@@ -599,9 +651,14 @@ function run_event(data) {
                 opponent_fly_card(data.location, data.card);
             }*/
             capture_cards(data.location, data.player);
+            capture_single($("#flyingCard"), data.player);
             break;
         case 'draw_card':
             draw_card(data.card);
+            break;
+            // Not symmetrical with play_card/take_card
+        case ':draw_match':
+            deckselect_enable(data.card);
             break;
         case 'draw_place':
             deck_place(data.location, data.card);
@@ -619,7 +676,7 @@ function run_event(data) {
         default:
             alert("Unknown message: " + data.type);
     }
-
+    animate_gate();
 }
 
 function ws_init() {
