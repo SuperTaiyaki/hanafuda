@@ -74,6 +74,13 @@ class Game:
 
         self.cards = self.cards[24:]
 
+        # Fuck with the deck a bit to make the draw_match come up
+        for i, c in enumerate(self.field):
+            if c is not None and c < 4:
+                self.field[i] += 10
+        self.field[0:1] = [0, 1]
+        self.cards[-1] = 3
+
         self.deck_top = None
 
         self.state = States.PLAY
@@ -151,16 +158,18 @@ class Game:
 
         # Special case: if there are 3 cards of the same suit on the field, take them all
         matches = self._search_field(self.hands[player][hand])
+        captures = [field]
         if (len(matches) == 3):
             # Could just as easily compute this is card/4+0, +1, +2, +3
             cap_cards = [self.field[x] for x in matches]
             self.captures[player].extend(cap_cards)
             for card in matches:
                 self.field[card] = None
+            captures = matches
         else:
             #cap_cards = [self.field[field]]
             self.field[field] = None
-        self.event("take_card", player, None, matches)
+        self.event("take_card", player, None, captures)
 
         #cap_cards.append(self.hands[player][hand])
         self.hands[player][hand] = None
@@ -201,6 +210,7 @@ class Game:
         if len(matches) == 0:
             # Nothing matches, put it into the field
             # Hrmmmmm, if the field is full this will explode
+            # TODO: Would be nice to use rindex instead of index, but doesn't exist on lists
             idx = self.field.index(None)
             self.field[idx] = card
             self.event("draw_place", player, card, idx)
@@ -271,8 +281,9 @@ class Game:
 
     def end_turn(self, player):
         # TODO: Yaku check goes here... maybe. koikoi() needs to use part of this...
-        self.player = 1 if self.player == 0 else 0
-        self.states = States.PLAY
+        # Also, having player come in and be ignored is weird
+        self.player ^= 1
+        self.state = States.PLAY
         # self.event("end_turn", player, None, [])
 
     def _search_field(self, suit):

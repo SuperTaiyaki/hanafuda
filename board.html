@@ -9,7 +9,7 @@
         <script type="text/javascript" src="/scripts/jquery-ui.js">
         </script>
         <!-- Tacking on GameID should hopefully stop opera caching this... -->
-        <script type="text/javascript" src="/scripts/hanafuda-js.js?${gameid}"></script>
+        <!--<script type="text/javascript" src="/scripts/hanafuda-js.js?${gameid}"></script>-->
         <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
 
         <script type="text/javascript">
@@ -95,7 +95,7 @@
     <!-- top: opponent hand (8 blank card backs) -->
     <div id="opponentHand" class="hand">
 %for i in range(0, 8):
-        <img class="card handCard" src="/img/back.gif" alt="Blank card" id="opponent_${i}" />
+        <img class="card" src="/img/back.gif" alt="Blank card" id="opponent_${i}" />
 %endfor
     </div>
 

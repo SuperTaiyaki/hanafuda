@@ -12,8 +12,10 @@ wsconn.onmessage = (data) ->
     $("#gamelist").html(data.data)
 
 wsconn.onclose = ->
-    alert("Server connection lost.")
+    $("#update_block").html("Connection lost")
+#    alert("Server connection lost.")
 
 wsconn.onerror = ->
-    alert("WebSocket error")
+    $("#update_block").html("WebSocket error")
+    #alert("WebSocket error")
 

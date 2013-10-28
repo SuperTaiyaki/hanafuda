@@ -118,7 +118,10 @@ class Server(object):
         p2 = player ^ 1
         # sanity checks
         try:
-            upd = self.game.play_card(player, hand, field)
+            if hand == -1:
+                upd = self.game.draw_match(player, field)
+            else:
+                upd = self.game.play_card(player, hand, field)
         except game.GameError as e:
             print("Game exception...")
             print(e.__repr__())
@@ -126,14 +129,19 @@ class Server(object):
         events_self = []
         events_other = []
 
+        # TODO: Filter out :deckselect for the wrong player
+        # Maybe all :commands should only go to active player?
+        print("Player: %s" % player)
         for event in self.game.get_events():
             print(event)
             if event['card'] is not None:
-                print event['type']
-                print event['card']
                 event['card'] = self.update_card(event['card'])
             events_self.append((event))
-            events_other.append((event))
+            print('First char: %s' % event['type'][0])
+            if event['type'][0] != ":": # or player == event['player']:
+                events_other.append((event))
+            else:
+                print("Excluding message from player %s" % player)
 
         self.game.clear_events()
 
@@ -143,7 +151,7 @@ class Server(object):
             events_self.append({'type': 'koikoi'})
         elif self.game.state == game.States.FINISHED:
             pass # Uhh...
-        else: # Other player
+        else: # Other player, state is PLAY
             events_self.append({'type': 'turn_end'})
             events_other.append({'type': 'start_turn'})
 
