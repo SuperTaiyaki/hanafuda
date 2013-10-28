@@ -2,178 +2,178 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 <html>
-	<head>
-		<!-- include all the relevant JS -->
-		<script type="text/javascript" src="/scripts/jquery.js">
-		</script>
-		<script type="text/javascript" src="/scripts/jquery-ui.js">
-		</script>
-		<!-- Tacking on GameID should hopefully stop opera caching this... -->
-		<script type="text/javascript" src="/scripts/hanafuda.js?${gameid}">
-		</script>
+    <head>
+        <!-- include all the relevant JS -->
+        <script type="text/javascript" src="/scripts/jquery.js">
+        </script>
+        <script type="text/javascript" src="/scripts/jquery-ui.js">
+        </script>
+        <!-- Tacking on GameID should hopefully stop opera caching this... -->
+        <script type="text/javascript" src="/scripts/hanafuda-js.js?${gameid}"></script>
+        <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
 
         <script type="text/javascript">
         gameid = ${gameid};
         playerid = ${player};
         </script>
 
-		<style>
-			div#koikoiPrompt {padding-left: 100px; padding-right:
-				100px; padding-top: 100px; padding-bottom:
-				100px;
-				background-color: #DCC;
-				position: absolute;
-				left: 40%;
-				top: 40%;
-				z-index: 20;
-			}
-			div#results {
-				padding-left: 100px; padding-right:
-				100px; padding-top: 100px; padding-bottom:
-				100px;
-				position: absolute;
-				background-color: #CCC;
-				left: 40%;
-				top: 40%;
-				display: none;
-				z-index: 20;
-				border: 3px solid black;
-			}
+        <style>
+            div#koikoiPrompt {padding-left: 100px; padding-right:
+                100px; padding-top: 100px; padding-bottom:
+                100px;
+                background-color: #DCC;
+                position: absolute;
+                left: 40%;
+                top: 40%;
+                z-index: 20;
+            }
+            div#results {
+                padding-left: 100px; padding-right:
+                100px; padding-top: 100px; padding-bottom:
+                100px;
+                position: absolute;
+                background-color: #CCC;
+                left: 40%;
+                top: 40%;
+                display: none;
+                z-index: 20;
+                border: 3px solid black;
+            }
 
-			div#fieldCards {padding-top:50px;padding-bottom:50px;
-				clear:left;float:left}
-			div#dataBox {float:left; padding-top:90px}
-			div#playerHand {clear:left}
-			div#screen {position:fixed;
-				width:100%;
-				height:100%;
-				top: 0;
-				left: 0;
-				background-color: #999;
-				z-index: 10;
-				opacity: 0.5;
-				display: none;}
-			div#alert {position:fixed;
-				width:500px;
-				left:100px;
-				background-color: #BBB;
-				top:0px;
-				height:50px;
-				border: 3px solid black;
-				z-index: 100;
-				text-align: center;
-				display: none;}
-				
-			div.capdiv {padding:5px}
-			span.button {padding-left:5em; padding-right:5em;
-				background-color: #FFF;}
+            div#fieldCards {padding-top:50px;padding-bottom:50px;
+                clear:left;float:left}
+            div#dataBox {float:left; padding-top:90px}
+            div#playerHand {clear:left}
+            div#screen {position:fixed;
+                width:100%;
+                height:100%;
+                top: 0;
+                left: 0;
+                background-color: #999;
+                z-index: 10;
+                opacity: 0.5;
+                display: none;}
+            div#alert {position:fixed;
+                width:500px;
+                left:100px;
+                background-color: #BBB;
+                top:0px;
+                height:50px;
+                border: 3px solid black;
+                z-index: 100;
+                text-align: center;
+                display: none;}
+                
+            div.capdiv {padding:5px}
+            span.button {padding-left:5em; padding-right:5em;
+                background-color: #FFF;}
 
-			#txtAlert {text-align: center;}
+            #txtAlert {text-align: center;}
 
 
-			/* 620px calculated from a full hand */
-			div.hand {clear:left; float:left; padding: 10px;
-				border: 1px solid black; width: 650px}
-			div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
-				margin-right: -80%;}
-			div#deck {z-index: -1;}
+            /* 620px calculated from a full hand */
+            div.hand {clear:left; float:left; padding: 10px;
+                border: 1px solid black; width: 650px}
+            div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
+                margin-right: -80%;}
+            div#deck {z-index: -1;}
 
-			img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
-			img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
-				z-index: 5;}
-			img.deckCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
-			img.capCard {margin-right: -30px}
-			.cardHighlight {background-color: #807575 !important}
-			.handDisabled {background-color: #888}
-			.card {background-color: #DDD}
-			.dragging {opacity:0.5}
-		</style>
-		<title>AJAX Hanafuda</title>
-	</head>
+            img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
+            img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
+                z-index: 5;}
+            img.deckCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
+            img.capCard {margin-right: -30px}
+            .cardHighlight {background-color: #807575 !important}
+            .handDisabled {background-color: #888}
+            .card {background-color: #DDD}
+            .dragging {opacity:0.5}
+        </style>
+        <title>AJAX Hanafuda</title>
+    </head>
 <body>
 
-	<!-- top: opponent hand (8 blank card backs) -->
-	<div id="opponentHand" class="hand">
+    <!-- top: opponent hand (8 blank card backs) -->
+    <div id="opponentHand" class="hand">
 %for i in range(0, 8):
-		<img class="card handCard" src="/img/back.gif" alt="Blank card" id="opponent_${i}" />
+        <img class="card handCard" src="/img/back.gif" alt="Blank card" id="opponent_${i}" />
 %endfor
-	</div>
+    </div>
 
-	<!-- nearby: opponent captures (4 rows of cards?) -->
-	<div id="opponentCaptures" class="captures">
-		<div style="float:left;clear:left"
-			class="capdiv capturesSlips"><a></a></div>
-		<div style="float:left" class="capdiv capturesDregs">
-		<a></a></div>
-		<div style="float:left;clear:left"
-			class="capdiv capturesBrights"><a></a></div>
-		<div style="float:left" class="capdiv capturesAnimals">
-		<a></a></div>
-	</div>
+    <!-- nearby: opponent captures (4 rows of cards?) -->
+    <div id="opponentCaptures" class="captures">
+        <div style="float:left;clear:left"
+            class="capdiv capturesSlips"><a></a></div>
+        <div style="float:left" class="capdiv capturesDregs">
+        <a></a></div>
+        <div style="float:left;clear:left"
+            class="capdiv capturesBrights"><a></a></div>
+        <div style="float:left" class="capdiv capturesAnimals">
+        <a></a></div>
+    </div>
 
-	<!-- middle L: field (2x6) -->
-	<div id="fieldCards" class="field">
-		<!-- table? -->
-		<table>
-			<tr>
+    <!-- middle L: field (2x6) -->
+    <div id="fieldCards" class="field">
+        <!-- table? -->
+        <table>
+            <tr>
 %for i in range(0, 12, 2):
 <td><img src="/img/empty.gif" class="card fieldCard" id="field_${i}" /></td>
 %endfor
-			<td rowspan="2">
-			<div id="deck" class="deck">
-				<img src="/img/back.gif" class="deckCard" id="deckCard" />
-			</div>
-			</td>
-			</tr>
-			<tr>
+            <td rowspan="2">
+            <div id="deck" class="deck">
+                <img src="/img/back.gif" class="deckCard" id="deckCard" />
+            </div>
+            </td>
+            </tr>
+            <tr>
 %for i in range(1, 12, 2):
 <td><img src="/img/empty.gif" class="card fieldCard" id="field_${i}" /></td>
 %endfor
-			</tr>
-		</table>
-	</div>
+            </tr>
+        </table>
+    </div>
 
-	<div id="dataBox" class="databox">
-		Multiplier: <span id="txtMultiplier">1</span>x<br />
-		Score: <span id="txtScore">0</span><br />
-		Opponent's score: <span id="txtOppScore">0</span><br />
-		Game ID: <a href="#" onclick="javascript:showLink();"><span id="txtGameId">-1</span></a><br />
-	</div>
-	<!-- middle R: scores, current multiplier, other status -->
+    <div id="dataBox" class="databox">
+        Multiplier: <span id="txtMultiplier">1</span>x<br />
+        Score: <span id="txtScore">0</span><br />
+        Opponent's score: <span id="txtOppScore">0</span><br />
+        Game ID: <a href="#" onclick="javascript:showLink();"><span id="txtGameId">-1</span></a><br />
+    </div>
+    <!-- middle R: scores, current multiplier, other status -->
 
-	<!-- bottom: player hand (8 face-up cards) -->
-	<div id="playerHand" class="hand">
+    <!-- bottom: player hand (8 face-up cards) -->
+    <div id="playerHand" class="hand">
 %for i in range(0, 8):
-		<img class="handCard card" src="/img/back.gif" alt="Blank card" id="player_${i}" />
-%endfor	
-	</div>
-	
-	<!-- bottom R: player captures (4 rows) -->
-	<div id="playerCaptures" class="captures">
-		<div style="float:left;clear:left"
-			class="capdiv capturesSlips"><a></a></div>
-		<div style="float:left" class="capdiv capturesDregs">
-		<a></a></div>
-		<div style="float:left;clear:left"
-			class="capdiv capturesBrights"><a></a></div>
-		<div style="float:left" class="capdiv capturesAnimals">
-		<a></a></div>
-	</div>
+        <img class="handCard card" src="/img/back.gif" alt="Blank card" id="player_${i}" />
+%endfor 
+    </div>
+    
+    <!-- bottom R: player captures (4 rows) -->
+    <div id="playerCaptures" class="captures">
+        <div style="float:left;clear:left"
+            class="capdiv capturesSlips"><a></a></div>
+        <div style="float:left" class="capdiv capturesDregs">
+        <a></a></div>
+        <div style="float:left;clear:left"
+            class="capdiv capturesBrights"><a></a></div>
+        <div style="float:left" class="capdiv capturesAnimals">
+        <a></a></div>
+    </div>
 
-	<div id="koikoiPrompt" class="prompt" style="display:none;">
-		<p>Finish round?</p>
-		<p><span class="button" onclick="koikoi()">Koikoi</span>
-		<span class="button" onclick="endGame()">Game</span></p>
-		<p>Hands: <span id="txtHands"></span></p>
-	</div>
+    <div id="koikoiPrompt" class="prompt" style="display:none;">
+        <p>Finish round?</p>
+        <p><span class="button" onclick="koikoi()">Koikoi</span>
+        <span class="button" onclick="endGame()">Game</span></p>
+        <p>Hands: <span id="txtHands"></span></p>
+    </div>
 
-	<div id="results" class="results">
-	</div>
-	<div id="screen">
-	</div>
-	<div id="alert" class="alert">
-		<span id="txtAlert">Waiting for opponent</span>
-	</div>
+    <div id="results" class="results">
+    </div>
+    <div id="screen">
+    </div>
+    <div id="alert" class="alert">
+        <span id="txtAlert">Waiting for opponent</span>
+    </div>
 <!-- Firefox is a bit brain-dead, if images aren't preloaded stuff doesn't work
 right -->
 % for img in images:

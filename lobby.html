@@ -5,29 +5,7 @@
 <head>
 <title>Hanafuda Lobby</title>
 <script type="text/javascript" src="/scripts/jquery.js"></script>
-<script type="text/javascript">
-$(document).ready(function() {
-if (!'WebSocket' in window) {
-    alert("No websocket support. Not going to work.");
-}
-
-var wsconn = new WebSocket("ws://localhost:8080/ws");
-
-wsconn.onopen = function() {
-}
-wsconn.onmessage = function(data) {
-    // alert("WS Message: " + data.data);
-    $("#gamelist").html(data.data);
-}
-wsconn.onclose = function() {
-    alert("Server connection lost.");
-}
-wsconn.onerror = function(err) {
-    alert("WebSocket error");
-    }
-});
-
-</script>
+<script type="text/javascript" src="/scripts/lobby.js"></script>
 </head>
 
 <body>

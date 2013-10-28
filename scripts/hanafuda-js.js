@@ -220,35 +220,8 @@ function get_deckcard() {
 }
 // }}}
 
+// Currently shadowed by some coffeescript stuff
 opponent_play_order = [];
-
-function opponent_place_card(field, card) {
-    var hand = opponent_play_order.pop();
-    var el = extract_card(get_opphand(hand));
-    set_card(el, card);
-    el.attr('id', 'flyingCard');
-    var dest = get_field(field);
-
-    var tgt = dest.offset();
-
-    if (dest.data('suit') === 'empty') {
-        cb = function() {
-            //don't actually replace the element, that kills
-            //the attributes
-            var c = {img: el.attr('src'),
-                suit: el.data("suit"),
-                rank: el.data("rank")};
-            clear_suit(dest);
-            set_card(dest, c);
-            el.remove();
-        }
-    } else {
-        tgt.top += 25;
-        tgt.left += 25;
-        cb = "void()";
-    }
-    move_card(el, tgt, cb);
-}
 
 function opponent_fly_card(location, card) {
     var hand = opponent_play_order.pop();
@@ -679,115 +652,9 @@ function run_event(data) {
     animate_gate();
 }
 
-function ws_init() {
-    wsock = new WebSocket('ws://localhost:8080/play_ws');
-    wsock.onopen = function() {
-        var data = new Object;
-        data.type = 'client_connect';
-        data.game_id = gameid;
-        data.player = playerid;
-        wsock.send(JSON.stringify(data));
-    };
-    wsock.onmessage = function(evt) {
-        var data = JSON.parse(evt.data);
-        for (var i = 0;i < data.length;i++) {
-            run_event(data[i]);
-        }
-    };
-}
+// Has to move across later because wsock
 
-function board_init(state) {
-    var i;
-    gamelink = state.gamelink;
-    $("#txtGameId").html(gameid);
-    //hand
-    for (i = 0;i < 8;i++) {
-        var cn = "#player_" + i;
-        if (state.hand[i].rank == -1) {
-            $(cn).css('display', 'none');
-        } else {
-            set_card($(cn), state.hand[i]);
-            $(cn).data('id', i);
-        }
-    }
 
-    //field
-    for (i = 0;i < 12;i++) {
-        var cn = "#field_" + i;
-        set_card($(cn), state.field[i]);
-        $(cn).data('id', i);
-    }
-
-    for (i = 0;i < state.captures_player.length;i++) {
-        var tgt = capture_dest(state.captures_player[i].rank, $("#playerCaptures"));
-        tgt.append("<img src=\"" + state.captures_player[i].img + "\" />");
-    }
-    for (i = 0;i < state.captures_opp.length;i++) {
-        var tgt = capture_dest(state.captures_opp[i].rank, $("#opponentCaptures"));
-        tgt.append("<img src=\"" + state.captures_opp[i].img + "\" />");
-    }
-    for (i = 0;i < state.opp_hand.length;i++) {
-        get_opphand(state.opp_hand[i]).css('display', 'none');
-    opponent_play_order.push(i);
-    // TODO: shuffle play_order
-    }
-
-    $("#screen").css('display', 'block');
-    $("#alert").css('display', 'block');
-    disable_hand();
-
-    if (!state.game_started) {
-        $("#screen").css('display', 'block');
-        $("#alert").css('display', 'block');
-    }
-    if (!state.active) {
-        disable_hand();
-    } else {
-        enable_hand();
-    }
-}
-
-/* Set up the initial board. Easier to do this via AJAX than to populate the inital HTML */
-function init() {
-    ws_init()
-
-    $("#deckCard").data('id', -1);
-
-    $(".fieldCard").droppable({drop: function(event, ui) {
-            place(ui.draggable.data("id"), $(this).data("id"),
-            ui.draggable, ui.position);
-            },
-            'disabled': true});
-
-    /* handle dragging and hovering cards
-     * On hover highlight the cards that match the highlighted card
-     * On drag lock the highlight
-     * On drag release or unhover remove the highlight
-     */
-    $("#playerHand > .handCard").draggable({helper: 'clone',
-            start: function(event, ui) {
-                dragging = true; //need to mark the original somehow
-                var month = $(this).data('suit');
-                draggingthing = $(this);
-                draggingthing.css('opacity', 0.2);
-                drag_targets(month, true);
-                },
-            stop: function() {
-                dragging = false;
-                draggingthing.css('opacity', 1.0);
-                unmark_field();
-                }});
-    $("#playerHand > .handCard").hover(function() {
-            //start hover handler, mark the suit
-            var suit = $(this).data('suit');
-            mark_field(suit, true);
-            }, function() {
-            //stop hover handler
-            unmark_field();
-            });
-    $("#deckCard").draggable({helper: 'clone',
-            disabled: true});
-}
 
 
 /* User took one of their cards and placed it, either on a matched card on an
@@ -842,7 +709,4 @@ function endGame() {
     
 }
 
-$(document).ready(function() {
-        init();
-        });
 
