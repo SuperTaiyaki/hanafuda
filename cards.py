@@ -9,7 +9,7 @@ import unittest
 # the cards are numbers from 0-47, as defined in cards.yaml.
 
 # abstract card
-class Card:
+class Card(object):
     image = ""
     suit = -1 # [0,12]
     rank = 1 # [20, 5, 10, 1]
@@ -97,7 +97,7 @@ for month in deckdef:
 
     suit += 1
 
-class Yaku:
+class Yaku(object):
     def __init__(self):
         self.filter = None
         self.count = 0
@@ -118,6 +118,7 @@ class Yaku:
     def _filter_attr(self, attr, caps):
         return filter(lambda c: attr in c.attrs, caps)
     def _in_caps(self, attr, caps):
+        # TODO: this is horribly inefficient, switch to itertools or any()
         return len(self._filter_attr(attr, caps)) > 0
 
 _all_hands = []
@@ -239,9 +240,10 @@ class Lights(Yaku):
     def names(self):
         return ["Five Lights", "Four Lights", "Dry Four Lights",
             "Three Lights"]
+print _all_hands
 # }}}
 
-class Scoring:
+class Scoring(object):
     names = [x.names() for x in _all_hands]
     names = [item for sublist in names
             for item in sublist]
@@ -251,16 +253,17 @@ class Scoring:
     def __init__(self):
         self.total = 0
         self.yakus = {}
-        for h in self.hands:
+        for h in _all_hands:
             self.yakus[h] = None
 
     def update(self, caps):
         score = 0
         new = False
+        cards = [DECK[card] for card in caps]
         for y in _all_hands:
-            if y.check(caps):
-                score += y.score(caps)
-                n = y.name(caps)
+            if y.check(cards):
+                score += y.score(cards)
+                n = y.name(cards)
                 self.yakus[y] = n
                 self.names[y.name] = True
         print("Old: ", self.total, "New: ", score)
@@ -345,6 +348,18 @@ class TestScoring(unittest.TestCase):
 
         self.assertFalse(animals.check(short))
         self.assertTrue(animals.check(long))
+
+    def testLights(self):
+        cards = [0, 8, 28]
+        score = Scoring()
+        score.update(cards)
+        self.assertTrue(score.get_score() > 0)
+
+    def testHanami(self):
+        cards = [42, 40]
+        score = Scoring()
+        score.update(cards)
+        self.assertTrue(score.get_score() > 0)
 
 class TestDraws(unittest.TestCase):
     def setUp(self):

@@ -326,6 +326,15 @@ start_game = () ->
     $("#alert").slideUp('fast')
     $("#screen").fadeOut(100)
 
+koikoi_prompt = (yaku) ->
+    text = ""
+    for y in yaku
+        text += y + "<br />"
+    $("#txtHands").html(text)
+    $("#koikoiPrompt").css('display', 'block')
+    screen_on()
+
+
 run_event = (data) ->
     console.log(data.type)
     console.log(data)
@@ -356,6 +365,8 @@ run_event = (data) ->
             deck_place(data.location, data.card)
         when 'draw_capture'
             deck_capture(data.location, data.player)
+        when ':koikoi'
+            koikoi_prompt(data.yaku)
         when 'turn_end'
             disable_hand()
         when 'start_turn'
@@ -367,6 +378,11 @@ run_event = (data) ->
                 setTimeout(() ->
                     $("#alert").slideUp('fast')
                 , 1000))
+        when 'results'
+            $("#results").html(data.data)
+            $("#results").css('display', 'block')
+            $("#results").draggable(); #if the user wants to see stuff
+            screen_on()
         else
             alert("Unknown message: " + data.type)
     animate_gate()
@@ -423,6 +439,9 @@ board_init = (state) ->
 # fieldID: ID of the card matched
 # Called from the field card droppable handler
 place = (handID, fieldID, el, tgt) ->
+    # This isn't cancelling right elsewhere
+    dragging = false
+    unmark_field() # May have to forcefully cancel the dragging global
     if (deck_select)
         el = lift_card(el)
     else
@@ -521,17 +540,13 @@ root.showLink = () ->
 
 
 root.koikoi = () ->
-    $.getJSON('koikoi', (json) ->
-            update(json)
-            # processYaku(json);
-    )
+    wsock.send(JSON.stringify(
+        'type': 'koikoi'))
     screen_off()
     $("#koikoiPrompt").css('display', 'none')
 
 root.endGame = () ->
-    $.getJSON('endgame', (json) ->
-            $("#koikoiPrompt").css('display', 'none')
-            update(json)
-    )
-
+    wsock.send(JSON.stringify(
+        'type': 'end_game'))
+    $("#koikoiPrompt").css('display', 'none')
 

@@ -63,22 +63,36 @@ class Server(object):
         return ret
         # This should set up deckselect or koikoi too. maybe.
 
-    def koikoi(self, player):
+    def koikoi(self, player, state):
 
         # Check to make sure this is legal
 
-        if not self.game.koikoi():
+        if self.game.state != game.States.KOIKOI:
             return # Empty return may crash the client, but it
             # shouldn't be doing this anyway
+
+        self.game.koikoi(player, state)
 
         # Trip a mostly empty update to make the turns switch
         # Should also show the opponent what happened
         alert  = "Opponent did not koikoi.<br />"
-        alert += "Multiplier is now %ix" % g.multiplier
+        # alert += "Multiplier is now %ix" % g.multiplier
 
-        self.set_update({'active': True, 'alert': alert,
-            'multiplier': g.multiplier})
-        return json.dumps({'multiplier': g.multiplier})
+        events_self = []
+        events_other = []
+        if self.game.state == game.States.FINISHED:
+            event = {'type': 'end'}
+            events_self.append(event)
+            events_other.append(event)
+            results_1 = self.score(self.game, player)
+            results_2 = self.score(self.game, player^1)
+            events_self.append({'type': 'results', 'data': results_1})
+            events_other.append({'type': 'results', 'data': results_2})
+        else:
+            events_self.append({'type': 'turn_end'})
+            events_other.append({'type': 'start_turn'})
+        self.send_messages(player, json.dumps(events_self), json.dumps(events_other))
+        self.game.clear_events() # Uhh... without reading them. 
 
     @cherrypy.expose
     def endgame(self, arg):
@@ -137,7 +151,6 @@ class Server(object):
             if event['card'] is not None:
                 event['card'] = self.update_card(event['card'])
             events_self.append((event))
-            print('First char: %s' % event['type'][0])
             if event['type'][0] != ":": # or player == event['player']:
                 events_other.append((event))
             else:
@@ -148,7 +161,7 @@ class Server(object):
         if self.game.state == game.States.DRAW_MATCH:
             events_self.append({'type': 'alert','text': "Deck card matches multiple cards on the field. Select one."})
         elif self.game.state == game.States.KOIKOI:
-            events_self.append({'type': 'koikoi'})
+            events_self.append({'type': ':koikoi', 'yaku': self.game.get_yaku(player)})
         elif self.game.state == game.States.FINISHED:
             pass # Uhh...
         else: # Other player, state is PLAY
@@ -248,4 +261,7 @@ class Server(object):
     def message(self, player, data):
         if data['type'] == 'place':
             self.place(player, int(data['hand']), int(data['field']))
-
+        elif data['type'] == 'koikoi':
+            self.koikoi(player, True)
+        elif data['type'] == 'end_game':
+            self.koikoi(player, False)

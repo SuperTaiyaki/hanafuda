@@ -23,7 +23,7 @@ Events = enum(
     'DRAW_PLACE', # Field ID
     )
 
-class Game:
+class Game(object):
     """ Class used to operate a game.
     Initialize to a new game state with new_game().
 
@@ -57,7 +57,6 @@ class Game:
         # take the first 3 slices of 8 cards to make the hands and field
         self.cards = range(48)
         self.captures = ([], [])
-#        self.scores = (cards.Scoring(), cards.Scoring())
         def draw():
             random.shuffle(self.cards)
             self.hands = (self.cards[0:8], self.cards[8:16])
@@ -75,11 +74,11 @@ class Game:
         self.cards = self.cards[24:]
 
         # Fuck with the deck a bit to make the draw_match come up
-        for i, c in enumerate(self.field):
-            if c is not None and c < 4:
-                self.field[i] += 10
-        self.field[0:1] = [0, 1]
-        self.cards[-1] = 3
+        #for i, c in enumerate(self.field):
+        #    if c is not None and c < 4:
+        #        self.field[i] += 10
+        #self.field[0:1] = [0, 1]
+        #self.cards[-1] = 3
 
         self.deck_top = None
 
@@ -89,8 +88,9 @@ class Game:
             dealer = random.randint(0, 1)
         self.player = dealer
 
-        self.koikoi = [0, 0]
-        self.scores = [0, 0] # Needed to check if there's a koikoi option
+        self.koikoi_count = [0, 0]
+#        self.scores = [0, 0] # Needed to check if there's a koikoi option
+        self.scores = (cards.Scoring(), cards.Scoring())
         self.multiplier = 1
         self.winner = None
 
@@ -105,12 +105,15 @@ class Game:
     def load(state):
         self.hands = state['hands']
         self.field = state['field']
-        self.captures = state['deck']
+        self.captures = state['captures']
         self.deck = state['deck']
-        self.koikoi = state['koikoi']
+        self.koikoi_count = state['koikoi']
         self.player = state['player']
         self.state = state['state']
         self.deck_top = state['deck_top']
+        self.scoring = (cards.Scoring(), cards.Scoring())
+        self.scoring[0].update(self.captures[0])
+        self.scoring[1].update(self.captures[1])
         # Calculate scores
 
     def dump():
@@ -120,7 +123,7 @@ class Game:
         ret['field'] = self.field
         ret['captures'] = self.captures
         ret['deck'] = self.deck
-        ret['koikoi'] = self.koikoi
+        ret['koikoi'] = self.koikoi_count
         ret['player'] = self.player
         ret['state'] = self.state
         ret['deck_top'] = self.deck_top
@@ -150,6 +153,12 @@ class Game:
     def clear_events(self):
         del self.events[0:]
 
+    def get_yaku(self, player):
+        return self.scores[player].get_names()
+
+    def get_score(self, player):
+        return self.scores[player].get_score()
+
     def _take_card(self, player, hand, field):
         if self.field[field] is None:
             raise GameError("Tried to place card on something; broken!")
@@ -167,7 +176,8 @@ class Game:
                 self.field[card] = None
             captures = matches
         else:
-            #cap_cards = [self.field[field]]
+            self.captures[player].append(self.hands[player][hand])
+            self.captures[player].append(self.field[field])
             self.field[field] = None
         self.event("take_card", player, None, captures)
 
@@ -266,9 +276,9 @@ class Game:
             raise GameError("Wrong player.")
 
         if koikoi:
-            self.koikoi[self.player] += 1
+            self.koikoi_count[self.player] += 1
             self.event("koikoi", player, [], [])
-            end_turn(player)
+            self.end_turn(player)
             return False
         else:
             self.winner = player
@@ -280,10 +290,14 @@ class Game:
         return self.scores[player]
 
     def end_turn(self, player):
-        # TODO: Yaku check goes here... maybe. koikoi() needs to use part of this...
-        # Also, having player come in and be ignored is weird
-        self.player ^= 1
-        self.state = States.PLAY
+        print("Captures: ", self.captures[player])
+        print("Other Captures: ", self.captures[player^1])
+        if self.scores[player].update(self.captures[player]):
+            #self.event(":koikoi", player, [], [])
+            self.state = States.KOIKOI
+        else:
+            self.player ^= 1
+            self.state = States.PLAY
         # self.event("end_turn", player, None, [])
 
     def _search_field(self, suit):
