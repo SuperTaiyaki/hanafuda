@@ -556,4 +556,7 @@ root.endGame = () ->
 root.win = () ->
     wsock.send(JSON.stringify(
         'type': 'win'))
+root.draw = () ->
+    wsock.send(JSON.stringify(
+        'type': 'draw'))
 

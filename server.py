@@ -173,12 +173,20 @@ class Server(object):
         # TODO: Move this elsewhere
         tmpl = Template(filename="results.html")
         ctx = {}
-        ctx['result'] = "Win" if g.winner == player else "Lose"
-        scores = g.get_score(g.winner)
-        ctx['score'] = scores.get_score()
-        ctx['multiplier'] = g.multiplier
-        ctx['finalScore'] = g.multiplier * ctx['score']
-        ctx['hands'] = scores.get_names()
+        if g.winner == -1:
+            ctx['result'] = "Draw"
+            ctx['score'] = 0
+            ctx['multiplier'] = 0
+            ctx['finalScore'] = 0
+            ctx['hands'] = ''
+        else:
+            ctx['result'] = "Win" if g.winner == player else "Lose"
+            scores = g.get_score(g.winner)
+            ctx['score'] = scores.get_score()
+            ctx['multiplier'] = g.multiplier
+            ctx['finalScore'] = g.multiplier * ctx['score']
+            ctx['hands'] = scores.get_names()
+
         ctx['next_game'] = next_game
         # print ctx
         return tmpl.render(c = ctx)
@@ -261,4 +269,6 @@ class Server(object):
         elif data['type'] == 'win':
             # Instant hanamizake
             self.game.captures[player].extend([8, 32])
+        elif data['type'] == 'draw':
+            del self.game.captures[player][:]
 
