@@ -25,8 +25,12 @@ class Match(object):
         self.ids = self.dispatcher.register(self.game)
 
     def end_round(self, winner, score):
-        self.scores.append(((winner^1)*score, winner*score))
-        self.next_dealer = winner
+        if winner == -1:
+            self.scores.append((0, 0))
+            self.next_dealer ^= 1
+        else:
+            self.scores.append(((winner^1)*score, winner*score))
+            self.next_dealer = winner
 
     def next_round(self):
         self.game = server.Server(self, self.next_dealer)
