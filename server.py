@@ -20,14 +20,13 @@ class GameFullException(Exception):
 # Layer between the Game instance and the frontend JS side
 class Server(object):
 
-    def __init__(self, lobby, gameid, options = None):
-        self.gameid = gameid
-        self.lobby = lobby # Almost redundant
+    def __init__(self, dispatcher, dealer = -1, options = None):
         self.game = game.Game()
-        self.game.new_game()
+        self.game.new_game(dealer)
         self.channels = [None, None] # WebSocket instances
         self.joined = [False, False]
         self.started = False
+        self.dispatcher = dispatcher
 
     def send_messages(self, player, own, other):
         self.channels[player].send(own)
@@ -38,7 +37,9 @@ class Server(object):
     @cherrypy.expose
     def render_state(self, player):
 
-        ret = {'gameid': self.gameid[player], 'player': player}
+        scores = self.dispatcher.get_scores()
+        ret = {'player': player, 'own_score': scores[player], 'opp_score': scores[player^1]}
+
         ret['hand'] = [self.update_card(c) for c in self.game.get_hand(player)]
 
         ret['field'] = [self.update_card(c) for c in self.game.get_field()]
@@ -50,8 +51,6 @@ class Server(object):
         ret['captures_opp'] = [self.update_card(c) for c in self.game.get_captures(player^1)]
 
         ret['opp_hand'] = [None for c in self.game.get_hand(player^1)]
-
-        ret['gamelink'] = self.lobby.join_link(self.gameid[player^1])
 
         if self.game.get_player() == player:
             ret['active'] = True
@@ -108,7 +107,11 @@ class Server(object):
         events_self = []
         events_other = []
         # TODO: log results with the lobby, ask if we're continuing
-        (id1, id2, _) = self.lobby.create_game()
+
+        score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner)
+        # Pull out the numerical score, don't need the rest of the data
+        self.dispatcher.end_round(self.game.winner, score.get_score())
+        (id1, id2) = self.dispatcher.next_round()
 
         results_1 = self.score(self.game, player, id1)
         results_2 = self.score(self.game, player^1, id2)
@@ -118,8 +121,6 @@ class Server(object):
         event = {'type': 'game_end'}
         events_self.append(event)
         events_other.append(event)
-
-        self.lobby.end_game(self.gameid) # And provide scores!
 
         return (events_self, events_other)
 
@@ -255,3 +256,9 @@ class Server(object):
             self.koikoi(player, True)
         elif data['type'] == 'end_game':
             self.koikoi(player, False)
+
+        # Debugging only!
+        elif data['type'] == 'win':
+            # Instant hanamizake
+            self.game.captures[player].extend([8, 32])
+

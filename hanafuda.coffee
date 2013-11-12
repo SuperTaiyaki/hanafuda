@@ -391,9 +391,11 @@ run_event = (data) ->
 
 
 board_init = (state) ->
-    gamelink = state.gamelink
+    # gamelink = state.gamelink
     playerid = state.player
     $("#txtGameId").html(gameid)
+    $("#txtScore").html(state.own_score)
+    $("#txtOppScore").html(state.opp_score)
     # hand
     for i in [0...8]
         cn = "#player_" + i
@@ -550,4 +552,8 @@ root.endGame = () ->
     wsock.send(JSON.stringify(
         'type': 'end_game'))
     $("#koikoiPrompt").css('display', 'none')
+
+root.win = () ->
+    wsock.send(JSON.stringify(
+        'type': 'win'))
 

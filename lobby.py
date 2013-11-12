@@ -12,51 +12,66 @@ from ws4py.websocket import WebSocket
 import server
 import cards
 
+class Match(object):
+    def __init__(self, dispatcher):
+        self.rounds = 6
+        self.rules = None
+        self.scores = [(0, 0)] # List of (player1, player2)
 
-class GameManager(object):
-    """Handles a single set of rounds """
-    # Options:
-    # rounds: 3, 6, 12
-    # custom rules to be specified later
-    def __init__(self, options):
-        if 'rounds' in options:
-            self.rounds = options['rounds']
-        else:
-            self.rounds = 12
-        self.scores = [0, 0]
-        # Randomize the dealer
-        # Spawn the current game
-    
-    def addScore(self, player, score):
-        self.scores[player] += score
-        # Spawn the new game with the correct dealer
+        self.dispatcher = dispatcher
+        self.next_dealer = -1
 
+        self.game = server.Server(self)
+        self.ids = self.dispatcher.register(self.game)
 
-class SessionManager(object):
-    """ Handles individual users and games, times them out due to
-    inactivity.
-    """
+    def end_round(self, winner, score):
+        self.scores.append(((winner^1)*score, winner*score))
+        self.next_dealer = winner
+
+    def next_round(self):
+        self.game = server.Server(self, self.next_dealer)
+        # Ask dispatcher for new IDs, return
+        self.ids = self.dispatcher.register(self.game)
+        return self.ids
+
+    def get_ids(self):
+        return self.ids
+
+    def get_game(self):
+        return self.game
+
+    def get_scores(self):
+        return map(sum, zip(*self.scores))
+
+class Dispatcher(object):
+
     def __init__(self):
-        self.sessions = []
-        cherrypy.session['manager'] = self # The only part clients
-        # should touch
+        self.games = {}
 
+    def create_id(self):
+        ti = 0
+        while True:
+            ti = random.randrange(11111111, 99999999)
+            if ti not in self.games:
+                break
+        return ti
 
-    def new(self, name = None):
-        if name == None:
-            name = self.generate_name()
-        sess = {'game': None,
-                'lastupdate': 0}
-        self.sessions.append(sess)
-    
-    def create_game(self, options):
-        g = GameManager(options)
-        cherrypy.session['game'] = g
+    def register(self, game):
+        id1 = self.create_id()
+        id2 = self.create_id()
+        self.games[id1] = (game, 0)
+        self.games[id2] = (game, 1)
+        return (id1, id2)
 
-    def get_session(self, id = -1):
-        # Error checking, whatever else...
-        # Delay the culling
-        return cherrypy.session['game'], cherrypy.session['player']
+    def delete(self, id1, id2):
+        del self.games[id1]
+        del self.games[id2]
+
+    def find(self, id):
+        if id in self.games:
+            return self.games[id]
+        return None, None
+
 
 def get_lobby():
     return root
@@ -72,6 +87,8 @@ class Lobby(object):
         f = open("namelist")
         self.names = f.readlines()
         f.close()
+
+        self.dispatcher = Dispatcher()
 
     def generate_name(self):
         return random.choice(self.names)
@@ -131,11 +148,14 @@ class Lobby(object):
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
 
-        (id1, id2, g) = self.create_game()
+        # Match isn't stored. The game instances will hold references, and eventually it should get GCed.
+        # Hopefully after recording a result to persistent storage
+        match = Match(self.dispatcher)
+        (id1, id2) = match.get_ids()
 
-        cherrypy.session['game'] = g
         cherrypy.session['player'] = 0
         cherrypy.session['game_id'] = id1
+        cherrypy.session['game'] = match.get_game()
 
         if lobby and 'name' in cherrypy.session:
             self.waiting[id2] = cherrypy.session['name']
@@ -143,29 +163,29 @@ class Lobby(object):
 
         raise cherrypy.HTTPRedirect("/board")
 
-    def end_game(self, id):
-        del self.games[id[0]]
-        del self.games[id[1]]
-
     @cherrypy.expose
     def join_game(self, id):
         id = int(id)
+ 
         if id in self.waiting:
             del self.waiting[id]
             self.game_alert()
-        if id not in self.games:
+
+       
+        game, player = self.dispatcher.find(id)
+        if game is None:
             raise cherrypy.HTTPRedirect("/")
-        game, player = self.games[id]
+
         cherrypy.session['game'] = game
         cherrypy.session['game_id'] = id
         raise cherrypy.HTTPRedirect("/board")
 
     def connect_client(self, pipe, id):
-        if id not in self.games:
+        game, player = self.dispatcher.find(id)
+        if game is None:
             return None
-        game = self.games[id][0]
-        game.connect(self.games[id][1], pipe)
-        return self.games[id]
+        game.connect(player, pipe)
+        return game, player
 
     @cherrypy.expose
     def ws(self):
@@ -179,14 +199,6 @@ class Lobby(object):
     # Return the link to join the game
     def join_link(self, gameid):
         return cherrypy.request.base + "/join_game?id=%i" % gameid
-
-    def create_id(self):
-        ti = 0
-        while True:
-            ti = random.randrange(11111111, 99999999)
-            if ti not in self.games:
-                break
-        return ti
 
     @cherrypy.expose
     def board(self):
@@ -222,6 +234,7 @@ class GameWS(WebSocket):
         if self.game is None:
             # Get a hold of the dispatcher
             self.game, self.player = get_lobby().connect_client(self, data['game_id'])
+            print("Connected player %s" % self.player)
         else:
             self.game.message(self.player, data)
     def opened(self):

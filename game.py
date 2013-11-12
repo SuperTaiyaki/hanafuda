@@ -16,13 +16,6 @@ States = enum(
     'KOIKOI', # Completed a yaku, expecting koikoi() or end()
     'FINISHED')
 
-Events = enum(
-    'CAPTURE', # list of field IDs
-    'DRAW', # To indicate what was on top of the deck (card id)
-    'DRAW_CAP', # list of field IDs
-    'DRAW_PLACE', # Field ID
-    )
-
 class Game(object):
     """ Class used to operate a game.
     Initialize to a new game state with new_game().
