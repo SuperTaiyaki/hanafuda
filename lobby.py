@@ -86,7 +86,7 @@ class Lobby(object):
 
     def get_game(self):
         return cherrypy.session['game']
-    
+
     def get_player(self):
         return cherrypy.session['player']
 
@@ -118,45 +118,53 @@ class Lobby(object):
         data['gamelist'] = self.gamelist_render()
         return self.tmpl.render(data = data)
 
+    def create_game(self):
+        id1 = self.create_id()
+        id2 = self.create_id()
+
+        g = server.Server(self, (id1, id2))
+        self.games[id1] = (g, 0)
+        self.games[id2] = (g, 1)
+
+        return (id1, id2, g)
+
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
 
-        if id == None or id in self.games:
-            id = self.create_id()
-        else:
-            id = int(id)
+        (id1, id2, g) = self.create_game()
 
-        g = server.Server(self, id)
         cherrypy.session['game'] = g
         cherrypy.session['player'] = 0
-        cherrypy.session['game_id'] = id
-        if lobby and 'name' in cherrypy.session:
-            self.waiting[id] = cherrypy.session['name']
-        self.games[id] = g
+        cherrypy.session['game_id'] = id1
 
-        self.game_alert()
+        if lobby and 'name' in cherrypy.session:
+            self.waiting[id2] = cherrypy.session['name']
+            self.game_alert()
 
         raise cherrypy.HTTPRedirect("/board")
+
+    def end_game(self, id):
+        del self.games[id[0]]
+        del self.games[id[1]]
 
     @cherrypy.expose
     def join_game(self, id):
         id = int(id)
         if id in self.waiting:
             del self.waiting[id]
+            self.game_alert()
         if id not in self.games:
             raise cherrypy.HTTPRedirect("/")
-        cherrypy.session['game'] = self.games[id]
-        cherrypy.session['player'] = 1
-        # should be checking g.active_players
-        # in case of a new round both players will join
+        game, player = self.games[id]
+        cherrypy.session['game'] = game
         cherrypy.session['game_id'] = id
         raise cherrypy.HTTPRedirect("/board")
 
-    def connect_client(self, pipe, id, player):
+    def connect_client(self, pipe, id):
         if id not in self.games:
             return None
-        game = self.games[id]
-        game.connect(player, pipe)
+        game = self.games[id][0]
+        game.connect(self.games[id][1], pipe)
         return self.games[id]
 
     @cherrypy.expose
@@ -185,16 +193,13 @@ class Lobby(object):
         if 'game' not in cherrypy.session:
             return 'Error: No active game'
         deck = ['/img/' + x.image for x in cards.DECK]
-        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'],
-                player = cherrypy.session['player'])
-
+        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'])
 
 listeners = []
 
 class EWS(WebSocket):
     def received_message(self, message):
         print("Received message")
-        print("message")
         self.send(message.data, message.is_binary)
     def opened(self):
         print("WS Connection opened")
@@ -216,8 +221,7 @@ class GameWS(WebSocket):
         data = json.loads(message.data)
         if self.game is None:
             # Get a hold of the dispatcher
-            self.game = get_lobby().connect_client(self, data['game_id'], data['player'])
-            self.player = data['player']
+            self.game, self.player = get_lobby().connect_client(self, data['game_id'])
         else:
             self.game.message(self.player, data)
     def opened(self):

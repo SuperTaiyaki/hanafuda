@@ -9,12 +9,10 @@
         <script type="text/javascript" src="/scripts/jquery-ui.js">
         </script>
         <!-- Tacking on GameID should hopefully stop opera caching this... -->
-        <!--<script type="text/javascript" src="/scripts/hanafuda-js.js?${gameid}"></script>-->
         <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
 
         <script type="text/javascript">
         gameid = ${gameid};
-        playerid = ${player};
         </script>
 
         <style>
@@ -162,8 +160,8 @@
 
     <div id="koikoiPrompt" class="prompt" style="display:none;">
         <p>Finish round?</p>
-        <p><span class="button" onclick="koikoi()">Koikoi</span>
-        <span class="button" onclick="endGame()">Game</span></p>
+        <p><span class="button" onclick="koikoi()">Koi</span></p>
+        <p><span class="button" onclick="endGame()">Game</span></p>
         <p>Hands: <span id="txtHands"></span></p>
     </div>
 

@@ -208,7 +208,6 @@ class Game(object):
             self._take_card(player, hand, field)
 
         self.deck_draw(player)
-        # TODO: Koikoi check, etc.
 
         return
 
@@ -290,14 +289,26 @@ class Game(object):
         return self.scores[player]
 
     def end_turn(self, player):
+
         print("Captures: ", self.captures[player])
         print("Other Captures: ", self.captures[player^1])
         if self.scores[player].update(self.captures[player]):
+            print("Koikoi option")
+            print self.hands
             #self.event(":koikoi", player, [], [])
-            self.state = States.KOIKOI
+            if any(self.hands[player]):
+                self.state = States.KOIKOI
+            else:
+                # Out of cards
+                self.state = States.FINISHED
+                self.winner = player
         else:
-            self.player ^= 1
-            self.state = States.PLAY
+            if not any((any(x) for x in self.hands)):
+                self.state = States.FINISHED
+                self.winner = -1 # Draw
+            else:
+                self.player ^= 1
+                self.state = States.PLAY
         # self.event("end_turn", player, None, [])
 
     def _search_field(self, suit):

@@ -1,6 +1,7 @@
 
 opponent_play_order = []
 dragging = false
+playerid = -1
 
 log = (msg) ->
     console.log(msg)
@@ -199,13 +200,13 @@ self_place_card = (field) ->
     dest.data('id', field); #  TODO: Maybe strip these out? They don't seem useful
     dest.attr('id', "field_" + field)
     dest.removeClass("handCard").addClass("fieldCard")
+    # TODO: blank rather than remove (well, the original, not the flying ver)
     fc.remove()
 
 opponent_place_card = (field, card) ->
     hand = opponent_play_order.pop()
     el = extract_card(get_opphand(hand))
     set_card(el, card)
-    el.attr('id', 'flyingCard')
 
     dest = get_field(field)
     tgt = dest.offset()
@@ -225,34 +226,34 @@ opponent_place_card = (field, card) ->
         tgt.top += 25
         tgt.left += 25
         cb = "void()" # TODO: What's the CoffeeScript way to do this?
+        cb = () -> undefined
+        el.attr('id', 'flyingCard')
     move_card(el, tgt, cb)
 
 opponent_fly_card = (location, card) ->
     hand = opponent_play_order.pop()
     el = extract_card(get_opphand(hand))
     set_card(el, card)
-    el.attr('id', 'flyingCard')
     dest = get_field(location)
 
     tgt = dest.offset()
     tgt.top += 25
     tgt.left += 25
+    # cb = () ->
+    el.attr('id', 'flyingCard')
 
     move_card(el, tgt)
 
-# function to make a class sit in the captures pile
+# function to return a function to make a class sit in the captures pile
 settle_card = (container, card) ->
-    container.append(card)
-    card.css('position', 'static')
-    card.attr('id', '')
-    card.removeClass().addClass("card capCard")
-    #card.draggable("option", "disabled", true)
-
-#get around annoying JS not-really-closures
-#TODO: Figure out how this works with CoffeeScript
-make_settlecard = (container, card) ->
+    # Extra layer of wrapping to bind container and card _now_
+    # Without this multiple captures go funny, because tgti keeps changing or something
     () ->
-        settle_card(container, card)
+        container.append(card)
+        card.css('position', 'static')
+        card.attr('id', '')
+        card.removeClass().addClass("card capCard")
+        #card.draggable("option", "disabled", true)
 
 capture_cards = (locations, player) ->
     #move flyingCard and field[data.field1[]] to captures
@@ -265,14 +266,13 @@ capture_cards = (locations, player) ->
 
         tgti = capture_dest(fcc.data('rank'), caps)
 
-        move_card(fcc, tgti.offset(), make_settlecard(tgti, fcc))
+        move_card(fcc, tgti.offset(), settle_card(tgti, fcc))
 
 capture_single = (card, player) ->
-    # TODO: playerid probably isn't available in this scope
     caps = if player == playerid then $("#playerCaptures") else $("#opponentCaptures")
     tgt = capture_dest(card.data('rank'), caps)
-    move_card(card, tgt.offset(), make_settlecard(tgt, card))
-
+    card.attr('id', '')
+    move_card(card, tgt.offset(), settle_card(tgt, card))
 
 # Lift the card off the top of the deck, blank the card underneath, return the new
 # handle (as flyingCard2)
@@ -378,6 +378,8 @@ run_event = (data) ->
                 setTimeout(() ->
                     $("#alert").slideUp('fast')
                 , 1000))
+        when 'game_end'
+            wsock.close()
         when 'results'
             $("#results").html(data.data)
             $("#results").css('display', 'block')
@@ -390,6 +392,7 @@ run_event = (data) ->
 
 board_init = (state) ->
     gamelink = state.gamelink
+    playerid = state.player
     $("#txtGameId").html(gameid)
     # hand
     for i in [0...8]
@@ -441,7 +444,7 @@ board_init = (state) ->
 place = (handID, fieldID, el, tgt) ->
     # This isn't cancelling right elsewhere
     dragging = false
-    unmark_field() # May have to forcefully cancel the dragging global
+    unmark_field()
     if (deck_select)
         el = lift_card(el)
     else
@@ -473,7 +476,6 @@ ws_init = () ->
         data =
             'type': 'client_connect'
             'game_id': gameid
-            'player': playerid
         wsock.send(JSON.stringify(data))
 
     wsock.onmessage = (evt) ->
@@ -508,7 +510,6 @@ init = ->
                 draggingthing.css('opacity', 0.2)
                 drag_targets(month, true)
             stop: () ->
-                console.log("Drag stop")
                 dragging = false
                 draggingthing.css('opacity', 1.0)
                 )

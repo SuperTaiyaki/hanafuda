@@ -20,8 +20,8 @@ class GameFullException(Exception):
 # Layer between the Game instance and the frontend JS side
 class Server(object):
 
-    def __init__(self, lobby, id, options = None):
-        self.gameid = id
+    def __init__(self, lobby, gameid, options = None):
+        self.gameid = gameid
         self.lobby = lobby # Almost redundant
         self.game = game.Game()
         self.game.new_game()
@@ -38,8 +38,7 @@ class Server(object):
     @cherrypy.expose
     def render_state(self, player):
 
-        # Getting bounced around a bit - player will 
-        ret = {'gameid': self.gameid, 'player': player}
+        ret = {'gameid': self.gameid[player], 'player': player}
         ret['hand'] = [self.update_card(c) for c in self.game.get_hand(player)]
 
         ret['field'] = [self.update_card(c) for c in self.game.get_field()]
@@ -52,7 +51,7 @@ class Server(object):
 
         ret['opp_hand'] = [None for c in self.game.get_hand(player^1)]
 
-        ret['gamelink'] = self.lobby.join_link(self.gameid)
+        ret['gamelink'] = self.lobby.join_link(self.gameid[player^1])
 
         if self.game.get_player() == player:
             ret['active'] = True
@@ -75,42 +74,21 @@ class Server(object):
 
         # Trip a mostly empty update to make the turns switch
         # Should also show the opponent what happened
-        alert  = "Opponent did not koikoi.<br />"
+        # alert  = "Opponent did not koikoi.<br />"
         # alert += "Multiplier is now %ix" % g.multiplier
 
         events_self = []
         events_other = []
         if self.game.state == game.States.FINISHED:
-            event = {'type': 'end'}
-            events_self.append(event)
-            events_other.append(event)
-            results_1 = self.score(self.game, player)
-            results_2 = self.score(self.game, player^1)
-            events_self.append({'type': 'results', 'data': results_1})
-            events_other.append({'type': 'results', 'data': results_2})
+            (evs, evo) = self.end_game(player)
+            events_self.extend(evs)
+            events_other.extend(evo)
         else:
             events_self.append({'type': 'turn_end'})
             events_other.append({'type': 'start_turn'})
+            events_other.append({'type': 'alert', 'text': 'Koi'})
         self.send_messages(player, json.dumps(events_self), json.dumps(events_other))
         self.game.clear_events() # Uhh... without reading them. 
-
-    @cherrypy.expose
-    def endgame(self, arg):
-        (g, player) = self.getsession()
-        
-        # Check to make sure this is legal
-
-        if not g.end(player):
-            return
-
-        # Save the results and delete the game to save memory
-        ret = {'results': self.score(g, player)}
-        p2 = 1 if player == 0 else 0
-        oupd = {'results': self.score(g, p2)}
-        self.reset_game()
-        self.set_update(oupd)
-        return json.dumps(ret)
-
 
     # Create a card representation the client can use
     def update_card(self,card):
@@ -125,6 +103,25 @@ class Server(object):
             ret['suit'] = "mon" + str(data.suit)
             ret['rank'] = data.rank
         return ret
+
+    def end_game(self, player):
+        events_self = []
+        events_other = []
+        # TODO: log results with the lobby, ask if we're continuing
+        (id1, id2, _) = self.lobby.create_game()
+
+        results_1 = self.score(self.game, player, id1)
+        results_2 = self.score(self.game, player^1, id2)
+        events_self.append({'type': 'results', 'data': results_1})
+        events_other.append({'type': 'results', 'data': results_2})
+
+        event = {'type': 'game_end'}
+        events_self.append(event)
+        events_other.append(event)
+
+        self.lobby.end_game(self.gameid) # And provide scores!
+
+        return (events_self, events_other)
 
     @cherrypy.expose
     def place(self, player, hand, field):
@@ -143,8 +140,6 @@ class Server(object):
         events_self = []
         events_other = []
 
-        # TODO: Filter out :deckselect for the wrong player
-        # Maybe all :commands should only go to active player?
         print("Player: %s" % player)
         for event in self.game.get_events():
             print(event)
@@ -163,16 +158,18 @@ class Server(object):
         elif self.game.state == game.States.KOIKOI:
             events_self.append({'type': ':koikoi', 'yaku': self.game.get_yaku(player)})
         elif self.game.state == game.States.FINISHED:
-            pass # Uhh...
+            (evs, evo) = self.end_game(player)
+            events_self.extend(evs)
+            events_other.extend(evo)
         else: # Other player, state is PLAY
             events_self.append({'type': 'turn_end'})
             events_other.append({'type': 'start_turn'})
 
         self.send_messages(player, json.dumps(events_self), json.dumps(events_other))
 
-
     @cherrypy.expose # testing only
-    def score(self, g, player):
+    def score(self, g, player, next_game):
+        # TODO: Move this elsewhere
         tmpl = Template(filename="results.html")
         ctx = {}
         ctx['result'] = "Win" if g.winner == player else "Lose"
@@ -181,7 +178,8 @@ class Server(object):
         ctx['multiplier'] = g.multiplier
         ctx['finalScore'] = g.multiplier * ctx['score']
         ctx['hands'] = scores.get_names()
-        print ctx
+        ctx['next_game'] = next_game
+        # print ctx
         return tmpl.render(c = ctx)
 
 
@@ -237,18 +235,10 @@ class Server(object):
         else:
             return "Invalid argument"
 
-    # Summary screen after the game is over
-    @cherrypy.expose
-    def scores(self):
-        (g, player) = self.getsession()
-        tmpl = Template(filename="scores.html")
-        won = False
-        if g.winner == player:
-            won = True
-
     def connect(self, player, client):
         self.channels[player] = client
         board_state = self.render_state(player)
+        print(board_state)
         board_state['type'] = 'init'
         client.send(json.dumps([board_state]))
 
