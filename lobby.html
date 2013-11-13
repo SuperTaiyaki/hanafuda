@@ -9,10 +9,9 @@
 </head>
 
 <body>
-<form action="setname" method="get">
-Name: <input type="text" name="name" value="${data['name']}" />
-<input type="submit" name="set" value="Change name" />
-<input type="submit" name="random" value="New random name" />
+<form action="aaaaaaaa" method="get">
+Name: <input id="namebox" type="text" name="name" value="${data['name']}" onblur="set_name();" />
+<input type="button" name="random" value="New random name" onclick="new_name();return false;" />
 </form>
 
 <p><a href="/new_game">Create new game</a></p>

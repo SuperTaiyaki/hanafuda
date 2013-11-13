@@ -112,6 +112,14 @@ class Dispatcher(object):
     def register_results(self, match):
         pass
 
+f = open("namelist")
+names = f.readlines()
+f.close()
+def generate_name():
+    return random.choice(names)
+
+
+
 def get_lobby():
     return root
 
@@ -123,17 +131,11 @@ class Lobby(object):
     def __init__(self):
         self.waiting = {} # Need to make sure this doesn't build up...
         self.games = {}
-        f = open("namelist")
-        self.names = f.readlines()
-        f.close()
-
         self.dispatcher = Dispatcher()
 
-    def generate_name(self):
-        return random.choice(self.names)
 
     def initsession(self):
-        cherrypy.session['name'] = self.generate_name()
+        cherrypy.session['name'] = generate_name()
 
     def getsession(self):
         if 'name' not in cherrypy.session:
@@ -143,16 +145,12 @@ class Lobby(object):
     def get_game(self):
         return cherrypy.session['game']
 
+    @cherrypy.expose
+    def set_name(self, name):
+        cherrypy.session['name'] = name
+
     def get_player(self):
         return cherrypy.session['player']
-
-    @cherrypy.expose
-    def setname(self, name, **blah):
-        if 'random' in blah:
-            cherrypy.session['name'] = self.generate_name()
-        else:
-            cherrypy.session['name'] = name
-        raise cherrypy.HTTPRedirect("/")
 
     def gamelist_render(self):
         games = []
@@ -164,6 +162,7 @@ class Lobby(object):
 
     def game_alert(self):
         gamelist = self.gamelist_render()
+        data = json.dumps({'type': 'games', 'games': gamelist})
         for l in listeners:
             l.send(gamelist) if l else '' # Might have become None
 
@@ -263,7 +262,12 @@ listeners = []
 class EWS(WebSocket):
     def received_message(self, message):
         print("Received message")
-        self.send(message.data, message.is_binary)
+        data = json.loads(message.data)
+        if data['type'] == 'new_name':
+            name = generate_name()
+            print("Sending new name")
+            self.send(json.dumps({'type': 'name', 'name': name}))
+
     def opened(self):
         print("WS Connection opened")
         listeners.append(self)
