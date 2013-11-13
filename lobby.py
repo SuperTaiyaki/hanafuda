@@ -13,16 +13,24 @@ import server
 import cards
 
 class Match(object):
+    template = Template(filename="settlement.html")
     def __init__(self, dispatcher):
-        self.rounds = 6
+        self.rounds = 2
+        self.current_round = 0
         self.rules = None
+        self.rate = 1
         self.scores = [(0, 0)] # List of (player1, player2)
 
         self.dispatcher = dispatcher
         self.next_dealer = -1
+        # Names for now, IDs later (maybe)
+        self.players = [None, None]
 
         self.game = server.Server(self)
-        self.ids = self.dispatcher.register(self.game)
+        self.ids = self.dispatcher.register(self)
+
+    def set_player(self, player, id):
+        self.players[player] = id
 
     def end_round(self, winner, score):
         if winner == -1:
@@ -33,9 +41,17 @@ class Match(object):
             self.next_dealer = winner
 
     def next_round(self):
-        self.game = server.Server(self, self.next_dealer)
-        # Ask dispatcher for new IDs, return
-        self.ids = self.dispatcher.register(self.game)
+        # This breaks refresh continuity a bit - if the player refreshes before they enter the new game they won't be
+        # able to come back
+        self.dispatcher.delete(*self.ids)
+
+        self.current_round += 1
+        if self.current_round < self.rounds:
+            self.game = server.Server(self, self.next_dealer)
+            # Ask dispatcher for new IDs, return
+            self.ids = self.dispatcher.register(self)
+        else:
+            self.ids = None, None
         return self.ids
 
     def get_ids(self):
@@ -47,10 +63,27 @@ class Match(object):
     def get_scores(self):
         return map(sum, zip(*self.scores))
 
+    def get_names(self):
+        return self.players
+
+    def show_results(self, player):
+        scores = self.get_scores()
+        diff = scores[player] - scores[player^1]
+
+        return self.template.render(player = self.players[player],
+                opp = self.players[player^1],
+                self_score = scores[player],
+                opp_score = scores[player^1],
+                difference = diff,
+                rate = self.rate,
+                settlement = diff * self.rate)
+
 class Dispatcher(object):
 
     def __init__(self):
         self.games = {}
+        # No session in websockets
+        self.results = {}
 
     def create_id(self):
         ti = 0
@@ -76,6 +109,8 @@ class Dispatcher(object):
             return self.games[id]
         return None, None
 
+    def register_results(self, match):
+        pass
 
 def get_lobby():
     return root
@@ -155,11 +190,13 @@ class Lobby(object):
         # Match isn't stored. The game instances will hold references, and eventually it should get GCed.
         # Hopefully after recording a result to persistent storage
         match = Match(self.dispatcher)
+        match.set_player(0, cherrypy.session['name'])
         (id1, id2) = match.get_ids()
 
         cherrypy.session['player'] = 0
         cherrypy.session['game_id'] = id1
         cherrypy.session['game'] = match.get_game()
+        cherrypy.session['match'] = match
 
         if lobby and 'name' in cherrypy.session:
             self.waiting[id2] = cherrypy.session['name']
@@ -174,20 +211,24 @@ class Lobby(object):
         if id in self.waiting:
             del self.waiting[id]
             self.game_alert()
-
        
-        game, player = self.dispatcher.find(id)
-        if game is None:
+        match, player = self.dispatcher.find(id)
+        if match is None:
             raise cherrypy.HTTPRedirect("/")
 
-        cherrypy.session['game'] = game
+        match.set_player(player, cherrypy.session['name'])
+        cherrypy.session['match'] = match
+        cherrypy.session['game'] = match.get_game()
         cherrypy.session['game_id'] = id
+        cherrypy.session['player'] = player
+        # TODO: This needs to load match into the session too
         raise cherrypy.HTTPRedirect("/board")
 
     def connect_client(self, pipe, id):
-        game, player = self.dispatcher.find(id)
-        if game is None:
+        match, player = self.dispatcher.find(id)
+        if match is None:
             return None
+        game = match.get_game()
         game.connect(player, pipe)
         return game, player
 
@@ -210,6 +251,12 @@ class Lobby(object):
             return 'Error: No active game'
         deck = ['/img/' + x.image for x in cards.DECK]
         return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'])
+
+    @cherrypy.expose
+    def results(self):
+        if 'match' not in cherrypy.session:
+            raise cherrypy.HTTPRedirect("/")
+        return cherrypy.session['match'].show_results(cherrypy.session['player'])
 
 listeners = []
 

@@ -13,6 +13,10 @@
 	</ul>
 <p>(You can drag this window)</p>
 
+% if 'next_game' in c:
 <a href="/join_game?id=${c['next_game']}">Next round</a>
+% else:
+<a href="/results">Results</a>
+% endif
 </div>
 

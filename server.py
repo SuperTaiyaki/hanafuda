@@ -106,7 +106,6 @@ class Server(object):
     def end_game(self, player):
         events_self = []
         events_other = []
-        # TODO: log results with the lobby, ask if we're continuing
 
         score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner)
         # Pull out the numerical score, don't need the rest of the data
@@ -187,7 +186,8 @@ class Server(object):
             ctx['finalScore'] = g.multiplier * ctx['score']
             ctx['hands'] = scores.get_names()
 
-        ctx['next_game'] = next_game
+        if next_game:
+            ctx['next_game'] = next_game
         # print ctx
         return tmpl.render(c = ctx)
 
@@ -256,7 +256,7 @@ class Server(object):
             data = json.dumps([{'type': 'game_start'}])
             self.send_messages(0, data, data)
             self.started = True
-    
+
     def message(self, player, data):
         if data['type'] == 'place':
             self.place(player, int(data['hand']), int(data['field']))
@@ -270,5 +270,6 @@ class Server(object):
             # Instant hanamizake
             self.game.captures[player].extend([8, 32])
         elif data['type'] == 'draw':
+            # Doesn't work so well... probably need to do this every turn
             del self.game.captures[player][:]
 
