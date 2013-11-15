@@ -83,14 +83,12 @@ def redslip(card):
     slip(card)
     card.attrs['redslip'] = True
 
-    # yaml is a YAML object containing the deck specification
 DECK = []
 suit = 0
 for month in deckdef:
     for card in month['month']:
         c = Card(card['img'], suit)
         # attributes are the names of functions defined above
-        # Dangerous if cards.yaml isn't 
         if 'attribute' in card:
             _attrib_helpers[card['attribute']](c)
         DECK.append(c)

@@ -110,10 +110,10 @@ class Server(object):
         score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner)
         # Pull out the numerical score, don't need the rest of the data
         self.dispatcher.end_round(self.game.winner, score.get_score())
-        (id1, id2) = self.dispatcher.next_round()
+        next_ids = self.dispatcher.next_round()
 
-        results_1 = self.score(self.game, player, id1)
-        results_2 = self.score(self.game, player^1, id2)
+        results_1 = self.score(self.game, player, next_ids[player])
+        results_2 = self.score(self.game, player^1, next_ids[player^1])
         events_self.append({'type': 'results', 'data': results_1})
         events_other.append({'type': 'results', 'data': results_2})
 

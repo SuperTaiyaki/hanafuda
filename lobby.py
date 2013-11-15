@@ -12,6 +12,27 @@ from ws4py.websocket import WebSocket
 import server
 import cards
 
+INITIAL_POINTS = 1000
+
+class Player(object):
+    def __init__(self):
+        self.id = ""
+        self.name = generate_name()
+        self.points = INITIAL_POINTS
+
+    def get_name(self):
+        return self.name
+
+    def set_name(self, name):
+        self.name = name
+
+    def get_score(self):
+        return self.points
+
+    def add_score(self, points):
+        self.points += points
+        return self.points
+
 class Match(object):
     template = Template(filename="settlement.html")
     def __init__(self, dispatcher):
@@ -40,6 +61,9 @@ class Match(object):
             self.scores.append(((winner^1)*score, winner*score))
             self.next_dealer = winner
 
+    def abort_game(self):
+        self.dispatcher.delete(*self.ids)
+
     def next_round(self):
         # This breaks refresh continuity a bit - if the player refreshes before they enter the new game they won't be
         # able to come back
@@ -52,6 +76,12 @@ class Match(object):
             self.ids = self.dispatcher.register(self)
         else:
             self.ids = None, None
+
+            # Do the settlement stuff
+            scores = self.get_scores()
+            diff = scores[0] - scores[1]
+            self.players[0].add_score(diff*self.rate)
+            self.players[1].add_score(diff*self.rate*-1)
         return self.ids
 
     def get_ids(self):
@@ -70,8 +100,8 @@ class Match(object):
         scores = self.get_scores()
         diff = scores[player] - scores[player^1]
 
-        return self.template.render(player = self.players[player],
-                opp = self.players[player^1],
+        return self.template.render(player = self.players[player].get_name(),
+                opp = self.players[player^1].get_name(),
                 self_score = scores[player],
                 opp_score = scores[player^1],
                 difference = diff,
@@ -133,21 +163,12 @@ class Lobby(object):
         self.games = {}
         self.dispatcher = Dispatcher()
 
-
-    def initsession(self):
-        cherrypy.session['name'] = generate_name()
-
-    def getsession(self):
-        if 'name' not in cherrypy.session:
-            self.initsession()
-        return {'name': cherrypy.session['name']}
-
     def get_game(self):
         return cherrypy.session['game']
 
     @cherrypy.expose
     def set_name(self, name):
-        cherrypy.session['name'] = name
+        cherrypy.session['player'].set_name(name)
 
     def get_player(self):
         return cherrypy.session['player']
@@ -164,13 +185,18 @@ class Lobby(object):
         gamelist = self.gamelist_render()
         data = json.dumps({'type': 'games', 'games': gamelist})
         for l in listeners:
-            l.send(gamelist) if l else '' # Might have become None
+            l.send(data) if l else '' # Might have become None
 
     @cherrypy.expose
     def default(self):
-        sess = self.getsession()
-        data = {'name': sess['name']}
+        if 'player' not in cherrypy.session:
+            p = Player()
+            cherrypy.session['player'] = p
+        player = cherrypy.session['player']
+
+        data = {'name': player.get_name()}
         data['gamelist'] = self.gamelist_render()
+        data['score'] = player.get_score()
         return self.tmpl.render(data = data)
 
     def create_game(self):
@@ -189,16 +215,16 @@ class Lobby(object):
         # Match isn't stored. The game instances will hold references, and eventually it should get GCed.
         # Hopefully after recording a result to persistent storage
         match = Match(self.dispatcher)
-        match.set_player(0, cherrypy.session['name'])
+        match.set_player(0, cherrypy.session['player'])
         (id1, id2) = match.get_ids()
 
-        cherrypy.session['player'] = 0
+        cherrypy.session['slot'] = 0
         cherrypy.session['game_id'] = id1
         cherrypy.session['game'] = match.get_game()
         cherrypy.session['match'] = match
 
-        if lobby and 'name' in cherrypy.session:
-            self.waiting[id2] = cherrypy.session['name']
+        if lobby:
+            self.waiting[id2] = cherrypy.session['player'].get_name()
             self.game_alert()
 
         raise cherrypy.HTTPRedirect("/board")
@@ -210,16 +236,16 @@ class Lobby(object):
         if id in self.waiting:
             del self.waiting[id]
             self.game_alert()
-       
+
         match, player = self.dispatcher.find(id)
         if match is None:
             raise cherrypy.HTTPRedirect("/")
 
-        match.set_player(player, cherrypy.session['name'])
+        match.set_player(player, cherrypy.session['player'])
         cherrypy.session['match'] = match
         cherrypy.session['game'] = match.get_game()
         cherrypy.session['game_id'] = id
-        cherrypy.session['player'] = player
+        cherrypy.session['slot'] = player
         # TODO: This needs to load match into the session too
         raise cherrypy.HTTPRedirect("/board")
 
@@ -239,7 +265,7 @@ class Lobby(object):
     @cherrypy.expose
     def play_ws(self):
         pass
-    
+
     # Return the link to join the game
     def join_link(self, gameid):
         return cherrypy.request.base + "/join_game?id=%i" % gameid
@@ -255,7 +281,7 @@ class Lobby(object):
     def results(self):
         if 'match' not in cherrypy.session:
             raise cherrypy.HTTPRedirect("/")
-        return cherrypy.session['match'].show_results(cherrypy.session['player'])
+        return cherrypy.session['match'].show_results(cherrypy.session['slot'])
 
 listeners = []
 
@@ -265,7 +291,6 @@ class EWS(WebSocket):
         data = json.loads(message.data)
         if data['type'] == 'new_name':
             name = generate_name()
-            print("Sending new name")
             self.send(json.dumps({'type': 'name', 'name': name}))
 
     def opened(self):
