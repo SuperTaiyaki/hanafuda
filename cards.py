@@ -197,7 +197,7 @@ class Dregs(Yaku):
     def __init__(self):
         Yaku.__init__(self)
         self._name = "Basic" # can't remember
-        self.filter = lambda c: c.rank == 1
+        self.filter = lambda c: c.rank == 1 or 'cup' in c.attrs
     def check(self, caps):
         f = filter(self.filter, caps)
         return len(f) >= 10
