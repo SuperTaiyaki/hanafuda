@@ -35,12 +35,20 @@ animate_gate = () ->
     if (run && !animating)
         animate_next()
 
+# This will need to be refactored eventually
+move_now = (el, target, callback) ->
+    el.animate(target, 'fast', 'swing', callback)
+
+
 # Fly el to a new location, then
 # call the callback.
 move_card = (el, target, callback) ->
     animation_frame.push(() ->
-        el.animate(target, 'fast', 'swing', callback)
+        move_now(el, target, callback)
     )
+
+animate_queue = (fn) ->
+    animation_frame.push(fn)
 
 
 # Raise a screen onto the playing area to block interaction. Used for dialogs.
@@ -101,6 +109,9 @@ capture_dest = (rank, path) ->
 lift_card = (el) ->
     pos = el.offset()
     clone = el.clone(true).appendTo('body')
+    if (clone.data('rank') == -1)
+        alert("Trying to lift an empty card")
+        console.log(el)
     clone.data('rank', el.data('rank'))
     clone.css('top', pos.top)
     clone.css('left', pos.left)
@@ -260,13 +271,16 @@ capture_cards = (locations, player) ->
     caps = if player == playerid then $("#playerCaptures") else $("#opponentCaptures")
 
     for loc in locations
-        fc = get_field(loc)
-        fcc = lift_card(fc)
-        blank_card(fc)
+        # Here we go again... this is going to be executed later, so bind loc now
+        do (loc) ->
+            animate_queue( () ->
+                fc = get_field(loc)
+                fcc = lift_card(fc)
+                blank_card(fc)
+                tgti = capture_dest(fcc.data('rank'), caps)
 
-        tgti = capture_dest(fcc.data('rank'), caps)
-
-        move_card(fcc, tgti.offset(), settle_card(tgti, fcc))
+                move_now(fcc, tgti.offset(), settle_card(tgti, fcc))
+            )
 
 capture_single = (card, player) ->
     caps = if player == playerid then $("#playerCaptures") else $("#opponentCaptures")
@@ -275,7 +289,7 @@ capture_single = (card, player) ->
     move_card(card, tgt.offset(), settle_card(tgt, card))
 
 # Lift the card off the top of the deck, blank the card underneath, return the new
-# handle (as flyingCard2)
+# handle
 # Not useful if the deck card isn't flipped up
 deck_lift = () ->
     dc = get_deckcard()
@@ -283,10 +297,7 @@ deck_lift = () ->
     blank_card(dc)
     dc.attr('src', '/img/back.gif')
     # set_card(dcc, data.deckcard)
-
-    # change the name just in case the animations overlap
-    dcc.attr('id', 'flyingCard2')
-    # return dcc;
+    dcc
 
 deck_place = (location, card) ->
     dcc = deck_lift()
@@ -300,6 +311,8 @@ deck_place = (location, card) ->
     move_card(dcc, tgtpos, cb)
 
 deck_capture = (locations, player) ->
+    # Queue rather than execute directly because the deck_lift might catch the card dropped by opponent_place_card
+    # because the callback. That gets ugly.
     # Fly the card to the temporary location on top of a captured card
     dcc = $("#flyingDeckCard")
     # flyingCard won't be null in case of a :deck_match
@@ -309,7 +322,6 @@ deck_capture = (locations, player) ->
         tgt_pos = target.offset()
         tgt_pos.top += 25
         tgt_pos.left += 25
-    #    dcc.attr('id', 'flyingCard');
 
         move_card(dcc, tgt_pos)
         animate_gate()

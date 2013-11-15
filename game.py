@@ -73,6 +73,14 @@ class Game(object):
         #self.field[0:1] = [0, 1]
         #self.cards[-1] = 3
 
+        # Same thing for the triple select
+        #for i, c in enumerate(self.field):
+        #    if c is not None and c < 4:
+        #        self.field[i] += 10
+        #self.field[0:2] = [0, 1, 2]
+        #self.hands[0][0] = 3
+        #self.hands[1][0] = 3
+
         self.deck_top = None
 
         self.state = States.PLAY
@@ -84,7 +92,7 @@ class Game(object):
         self.koikoi_count = [0, 0]
 #        self.scores = [0, 0] # Needed to check if there's a koikoi option
         self.scores = (cards.Scoring(), cards.Scoring())
-        self.multiplier = 1
+        self.multiplier = [1, 1]
         self.winner = None
 
         # Write-only.
@@ -151,6 +159,9 @@ class Game(object):
 
     def get_score(self, player):
         return self.scores[player].get_score()
+
+    def get_multiplier(self, player):
+        return self.multiplier[player]
 
     def _take_card(self, player, hand, field):
         if self.field[field] is None:
@@ -282,9 +293,6 @@ class Game(object):
         return self.scores[player]
 
     def end_turn(self, player):
-
-        print("Captures: ", self.captures[player])
-        print("Other Captures: ", self.captures[player^1])
         if self.scores[player].update(self.captures[player]):
             print("Koikoi option")
             print self.hands
@@ -302,6 +310,9 @@ class Game(object):
             else:
                 self.player ^= 1
                 self.state = States.PLAY
+
+        if self.scores[player] > 7:
+            self.multiplier[player] = 2
         # self.event("end_turn", player, None, [])
 
     def _search_field(self, suit):

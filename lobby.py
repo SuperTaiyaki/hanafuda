@@ -3,6 +3,8 @@
 import random
 import json
 
+import gc
+
 from mako.template import Template
 
 import cherrypy
@@ -50,6 +52,9 @@ class Match(object):
         self.game = server.Server(self)
         self.ids = self.dispatcher.register(self)
 
+    def __del__(self):
+        print("MATCH object deleted------------------")
+
     def set_player(self, player, id):
         self.players[player] = id
 
@@ -63,6 +68,12 @@ class Match(object):
 
     def abort_game(self):
         self.dispatcher.delete(*self.ids)
+        # Should this be in here or in the dispatcher? Really, neither should have to know about the lobby
+        get_lobby().cancel(self.ids)
+        # Does deleting self.game deallocate?
+        # And does this result in this object being deleted?
+        # This should hopefully get swept up in the near future too
+        del self.game # Circular reference
 
     def next_round(self):
         # This breaks refresh continuity a bit - if the player refreshes before they enter the new game they won't be
@@ -131,8 +142,10 @@ class Dispatcher(object):
         return (id1, id2)
 
     def delete(self, id1, id2):
-        del self.games[id1]
-        del self.games[id2]
+        if id1 in self.games:
+            del self.games[id1]
+        if id2 in self.games:
+            del self.games[id2]
 
     def find(self, id):
         if id in self.games:
@@ -148,8 +161,6 @@ f.close()
 def generate_name():
     return random.choice(names)
 
-
-
 def get_lobby():
     return root
 
@@ -160,7 +171,6 @@ class Lobby(object):
 
     def __init__(self):
         self.waiting = {} # Need to make sure this doesn't build up...
-        self.games = {}
         self.dispatcher = Dispatcher()
 
     def get_game(self):
@@ -187,6 +197,16 @@ class Lobby(object):
         for l in listeners:
             l.send(data) if l else '' # Might have become None
 
+    def cancel(self, ids):
+        deleted = False
+        for id in ids:
+            # Yay thread-unsafety
+            if id in self.waiting:
+                del self.waiting[id]
+                deleted = True
+        if deleted:
+            self.game_alert()
+
     @cherrypy.expose
     def default(self):
         if 'player' not in cherrypy.session:
@@ -197,20 +217,15 @@ class Lobby(object):
         data = {'name': player.get_name()}
         data['gamelist'] = self.gamelist_render()
         data['score'] = player.get_score()
+
+        print(self.dispatcher.games)
+        gc.collect()
         return self.tmpl.render(data = data)
-
-    def create_game(self):
-        id1 = self.create_id()
-        id2 = self.create_id()
-
-        g = server.Server(self, (id1, id2))
-        self.games[id1] = (g, 0)
-        self.games[id2] = (g, 1)
-
-        return (id1, id2, g)
 
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
+        if 'player' not in cherrypy.session:
+            raise cherrypy.HTTPRedirect("/")
 
         # Match isn't stored. The game instances will hold references, and eventually it should get GCed.
         # Hopefully after recording a result to persistent storage
@@ -294,14 +309,14 @@ class EWS(WebSocket):
             self.send(json.dumps({'type': 'name', 'name': name}))
 
     def opened(self):
-        print("WS Connection opened")
+        #print("WS Connection opened")
         listeners.append(self)
     def notify(self, data):
         self.send(json.dumps(data), False)
-        print("Added listener")
+        #print("Added listener")
     def closed(self, code, reason = None):
         listeners.remove(self)
-        print("Removed listener")
+        #print("Removed listener")
 
 
 class GameWS(WebSocket):
@@ -320,7 +335,9 @@ class GameWS(WebSocket):
     def opened(self):
         pass
     def closed(self, code, reason = None):
-        pass
+        if self.game is not None:
+            self.game.disconnect(self.player, self)
+            del self.game
 
 
 root = Lobby()

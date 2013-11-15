@@ -10,6 +10,8 @@ import time
 import random
 import Queue
 
+import config
+
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
@@ -182,8 +184,8 @@ class Server(object):
             ctx['result'] = "Win" if g.winner == player else "Lose"
             scores = g.get_score(g.winner)
             ctx['score'] = scores.get_score()
-            ctx['multiplier'] = g.multiplier
-            ctx['finalScore'] = g.multiplier * ctx['score']
+            ctx['multiplier'] = g.get_multiplier(g.winner)
+            ctx['finalScore'] = g.multiplier[g.winner] * ctx['score']
             ctx['hands'] = scores.get_names()
 
         if next_game:
@@ -257,6 +259,13 @@ class Server(object):
             self.send_messages(0, data, data)
             self.started = True
 
+    def disconnect(self, player, client):
+        print("Client disconnected")
+        # TODO: This will happen at the end of a game too
+        self.channels[player] = None
+        if not any(self.channels) and self.game.state != game.States.FINISHED:
+            self.dispatcher.abort_game()
+
     def message(self, player, data):
         if data['type'] == 'place':
             self.place(player, int(data['hand']), int(data['field']))
@@ -265,6 +274,8 @@ class Server(object):
         elif data['type'] == 'end_game':
             self.koikoi(player, False)
 
+        if not config.DEBUG:
+            return
         # Debugging only!
         elif data['type'] == 'win':
             # Instant hanamizake
