@@ -2,7 +2,7 @@ $(document).ready = ->
     if (!'WebSocket' in window)
         alert("No websocket support. Not going to work.")
 
-wsconn = new WebSocket("ws://localhost:8080/ws")
+wsconn = new WebSocket(socket)
 
 wsconn.onopen = ->
     "" # What's the 'pass' equivalent?

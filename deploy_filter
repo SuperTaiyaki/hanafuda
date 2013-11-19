@@ -1,0 +1,10 @@
++ /*.py
++ /*.html
++ /namelist
++ /cards.yaml
++ /gamelist.tpl
++ /img/
++ /img/*
++ /scripts/
++ /scripts/*.js
+- *

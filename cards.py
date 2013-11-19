@@ -238,7 +238,6 @@ class Lights(Yaku):
     def names(self):
         return ["Five Lights", "Four Lights", "Dry Four Lights",
             "Three Lights"]
-print _all_hands
 # }}}
 
 class Scoring(object):
@@ -264,7 +263,6 @@ class Scoring(object):
                 n = y.name(cards)
                 self.yakus[y] = n
                 self.names[y.name] = True
-        print("Old: ", self.total, "New: ", score)
         if score > self.total:
             new = True
         self.total = score

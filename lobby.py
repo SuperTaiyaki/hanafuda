@@ -3,18 +3,18 @@
 import random
 import json
 
-import gc
-
 from mako.template import Template
-
 import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
 import server
 import cards
+import config
 
 INITIAL_POINTS = 1000
+
+root = None
 
 class Player(object):
     def __init__(self):
@@ -189,7 +189,8 @@ class Lobby(object):
             games.append({
                 'name': name,
                 'link': "/join_game?id=%i" % id})
-        return self.list_tpl.render(gamelist = games)
+        ret = self.list_tpl.render(gamelist = games)
+        return ret
 
     def game_alert(self):
         gamelist = self.gamelist_render()
@@ -215,12 +216,12 @@ class Lobby(object):
         player = cherrypy.session['player']
 
         data = {'name': player.get_name()}
+        print(data)
         data['gamelist'] = self.gamelist_render()
+        print(data)
         data['score'] = player.get_score()
 
-        print(self.dispatcher.games)
-        gc.collect()
-        return self.tmpl.render(data = data)
+        return self.tmpl.render(data = data, socket = config.WEBSOCKET_URL)
 
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
@@ -290,7 +291,7 @@ class Lobby(object):
         if 'game' not in cherrypy.session:
             return 'Error: No active game'
         deck = ['/img/' + x.image for x in cards.DECK]
-        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'])
+        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'], socket = config.WEBSOCKET_URL)
 
     @cherrypy.expose
     def results(self):
@@ -339,34 +340,53 @@ class GameWS(WebSocket):
             self.game.disconnect(self.player, self)
             del self.game
 
+class app2(object):
+    tpl = Template(filename="gamelist.tpl")
+    @cherrypy.expose
+    def default(self, **crap):
+        print("About to do test template render")
+        print(Template("aaaaaaaaaaaaaaaaaaaa inside templaet").render())
+        #ret = self.tpl.render(gamelist = [])
+        #print(ret)
+        return "Nothing to see here"
 
-root = Lobby()
 
-WebSocketPlugin(cherrypy.engine).subscribe()
-cherrypy.tools.websocket = WebSocketTool() 
+#root = app2()
 
-# This doesn't work for some reason - 
-#wsconfig = {'/': {'tools.websocket.on': True,
-#        'tools.websocket.handler_cls': EWS}}
-#cherrypy.tree.mount(root, '/ws', wsconfig)
+def run():
+    global root
+    root = Lobby()
+    WebSocketPlugin(cherrypy.engine).subscribe()
+    cherrypy.tools.websocket = WebSocketTool() 
 
-cherrypy.server.shutdown_timeout = 0
-#cherrypy.quickstart(root, '/', 'cpconfig')
+    # This doesn't work for some reason - 
+    #wsconfig = {'/': {'tools.websocket.on': True,
+    #        'tools.websocket.handler_cls': EWS}}
+    #cherrypy.tree.mount(root, '/ws', wsconfig)
 
-cherrypy.config.update({'tools.sessions.on': True,
-    'tool.staticdir.root': '/home/rek/code/hanafuda'})
-cherrypy.quickstart(root, '/', {
-    '/ws': {
-        'tools.websocket.on': True,
-        'tools.websocket.handler_cls': EWS},
-    '/play_ws': {
-        'tools.websocket.on': True,
-        'tools.websocket.handler_cls': GameWS},
+    cherrypy.server.shutdown_timeout = 0
+    #cherrypy.quickstart(root, '/', 'cpconfig')
 
-    '/scripts': {
-        'tools.staticdir.on': True,
-        'tools.staticdir.dir': '/home/rek/code/hanafuda/scripts'},
-    '/img': {
-        'tools.staticdir.on': True,
-        'tools.staticdir.dir': '/home/rek/code/hanafuda/img'}})
-# Websocket weirdness... reassemble this correctly later
+    cherrypy.server.socket_port = config.SERVER_PORT
+    cherrypy.server.socket_host = config.SERVER_IP
+
+    cherrypy.config.update({'tools.sessions.on': True,
+        'tools.staticdir.root': config.ASSETS_PATH})
+    cherrypy.quickstart(root, '/', {
+        '/ws': {
+            'tools.websocket.on': True,
+            'tools.websocket.handler_cls': EWS},
+        '/play_ws': {
+            'tools.websocket.on': True,
+            'tools.websocket.handler_cls': GameWS},
+
+        '/scripts': {
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': 'scripts'},
+        '/img': {
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': 'img'}})
+
+if __name__ == "__main__":
+    run()
+

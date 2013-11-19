@@ -4,11 +4,15 @@
 <html>
 <head>
 <title>Hanafuda Lobby</title>
+<script type="text/javascript">
+socket = "${socket}/ws";
+</script>
 <script type="text/javascript" src="/scripts/jquery.js"></script>
 <script type="text/javascript" src="/scripts/lobby.js"></script>
 </head>
 
 <body>
+<p><b>Currently under testing. Expect things to break.</b></p>
 <form action="aaaaaaaa" method="get">
 Name: <input id="namebox" type="text" name="name" value="${data['name']}" onblur="set_name();" />
 <input type="button" name="random" value="New random name" onclick="new_name();return false;" />
@@ -37,8 +41,7 @@ be highlighted). Current house rules:
 </ul>
 Rule variants may be made available later.</p>
 
-<p>The client has been tested in Firefox, Opera and Chromium (Chrome). It should work in any modern browser with
-proper javascript support.</p>
+<p>This has been tested in Opera 12.15 and Chromium 30.</p>
 </body>
 </html>
 

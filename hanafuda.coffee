@@ -485,7 +485,7 @@ place = (handID, fieldID, el, tgt) ->
     wsock.send(JSON.stringify(data))
 
 ws_init = () ->
-    wsock = new WebSocket('ws://localhost:8080/play_ws')
+    wsock = new WebSocket(socket_url)
     wsock.onopen = () ->
         data =
             'type': 'client_connect'

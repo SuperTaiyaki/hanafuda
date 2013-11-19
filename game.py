@@ -90,7 +90,7 @@ class Game(object):
         self.player = dealer
 
         self.koikoi_count = [0, 0]
-#        self.scores = [0, 0] # Needed to check if there's a koikoi option
+        # Needed to check if there's a koikoi option, hence the full tracking
         self.scores = (cards.Scoring(), cards.Scoring())
         self.multiplier = [1, 1]
         self.winner = None

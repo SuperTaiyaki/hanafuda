@@ -3,16 +3,17 @@
 <html>
     <head>
         <!-- include all the relevant JS -->
+        <script type="text/javascript">
+        gameid = ${gameid};
+        socket_url = "${socket}/play_ws";
+        </script>
+
         <script type="text/javascript" src="/scripts/jquery.js">
         </script>
         <script type="text/javascript" src="/scripts/jquery-ui.js">
         </script>
         <!-- Tacking on GameID should hopefully stop opera caching this... -->
         <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
-
-        <script type="text/javascript">
-        gameid = ${gameid};
-        </script>
 
         <style>
             div#koikoiPrompt {padding-left: 100px; padding-right:
@@ -70,7 +71,7 @@
 
             /* 620px calculated from a full hand */
             div.hand {clear:left; float:left; padding: 10px;
-                border: 1px solid black; width: 650px}
+                border: 1px solid black; width: 650px; height: 128px;}
             div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
                 margin-right: -80%;}
             div#deck {z-index: -1;}
