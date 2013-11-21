@@ -231,11 +231,13 @@ class Game(object):
             # Only one match, take both cards
             match = matches[0]
             self.captures[player].extend([self.field[match], card])
+            self.event("draw_place", player, None, matches[0:1])
             self.event("draw_capture", player, self.field[match], matches)
             self.field[match] = None
         elif len(matches) == 3: # Special rule, 3 matches -> take them all
             # If not for this the other 2 cards would be stuck on the field
             cap_cards = [self.field[x] for x in matches]
+            self.event("draw_place", player, None, matches[0:1])
             self.event("draw_capture", player, None, matches) # cards aren't actually useful here
             self.captures[player].extend(cap_cards)
             self.captures[player].append(card)
@@ -247,6 +249,7 @@ class Game(object):
             self.state = States.DRAW_MATCH
             self.event(":draw_match", player, card, None)
             return # Not ending the turn yet!
+            # Will be joined back in draw_match
 
         self.end_turn(player)
 
@@ -267,6 +270,7 @@ class Game(object):
 
         self.captures[player].extend([self.field[field],self.deck_top])
         self.deck_top = None
+        self.event("draw_place", player, None, [field])
         self.event("draw_capture", player, self.field[field], [field])
         self.field[field] = None
         self.end_turn(player)

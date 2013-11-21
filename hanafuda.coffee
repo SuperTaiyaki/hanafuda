@@ -35,21 +35,12 @@ animate_gate = () ->
     if (run && !animating)
         animate_next()
 
-# This will need to be refactored eventually
+# Fly el to a new location, then
 move_now = (el, target, callback) ->
     el.animate(target, 'fast', 'swing', callback)
 
-
-# Fly el to a new location, then
-# call the callback.
-move_card = (el, target, callback) ->
-    animation_frame.push(() ->
-        move_now(el, target, callback)
-    )
-
 animate_queue = (fn) ->
     animation_frame.push(fn)
-
 
 # Raise a screen onto the playing area to block interaction. Used for dialogs.
 screen_on = () ->
@@ -136,6 +127,11 @@ get_deckcard = () ->
     $("#deckCard")
 
 
+get_hand_id = (card) ->
+    card.attr('id').slice(7, 9)
+get_field_id = (field) ->
+    field.attr('id').slice(6, 8)
+
 # enter deck selection mode, where there are multiple options from the field to
 # match a card from the deck. The player can only take the deck card and match
 # it to field cards of the same suit.
@@ -193,32 +189,11 @@ unmark_field = () ->
         $(".fieldCard.cardHighlight").removeClass('cardHighlight')
         drag_targets("", false)
 
-# Plant the player's dragged card if necessary
-self_place_card = (field) ->
-    dest = get_field(field)
-    if (dest.data('suit') != "empty")
-        # A capture, nothing to do
-        return
-    fc = $("#flyingCard")
-    # card has attributes and junk, so manually copy over
-    # the important stuff
-    c =
-        'img': fc.attr('src'),
-        'suit': fc.data("suit"),
-        'rank': fc.data("rank")
-    clear_suit(dest)
-    set_card(dest, c)
-    dest.data('id', field); #  TODO: Maybe strip these out? They don't seem useful
-    dest.attr('id', "field_" + field)
-    dest.removeClass("handCard").addClass("fieldCard")
-    # TODO: blank rather than remove (well, the original, not the flying ver)
-    fc.remove()
+# ANIMATION UTILITY FUNCTIONS. NOT DELAYED. WRAP IN AN ANIMATE_QUEUE
 
-opponent_place_card = (field, card) ->
-    hand = opponent_play_order.pop()
-    el = extract_card(get_opphand(hand))
-    set_card(el, card)
-
+# Take el and dump it to field location
+# It will be left as flyingCard if the location is filled
+place_card = (el, field) ->
     dest = get_field(field)
     tgt = dest.offset()
 
@@ -239,21 +214,7 @@ opponent_place_card = (field, card) ->
         cb = "void()" # TODO: What's the CoffeeScript way to do this?
         cb = () -> undefined
         el.attr('id', 'flyingCard')
-    move_card(el, tgt, cb)
-
-opponent_fly_card = (location, card) ->
-    hand = opponent_play_order.pop()
-    el = extract_card(get_opphand(hand))
-    set_card(el, card)
-    dest = get_field(location)
-
-    tgt = dest.offset()
-    tgt.top += 25
-    tgt.left += 25
-    # cb = () ->
-    el.attr('id', 'flyingCard')
-
-    move_card(el, tgt)
+    move_now(el, tgt, cb)
 
 # function to return a function to make a class sit in the captures pile
 settle_card = (container, card) ->
@@ -266,6 +227,8 @@ settle_card = (container, card) ->
         card.removeClass().addClass("card capCard")
         #card.draggable("option", "disabled", true)
 
+
+# Move all cards from [locations] to player's discards
 capture_cards = (locations, player) ->
     #move flyingCard and field[data.field1[]] to captures
     caps = if player == playerid then $("#playerCaptures") else $("#opponentCaptures")
@@ -273,20 +236,62 @@ capture_cards = (locations, player) ->
     for loc in locations
         # Here we go again... this is going to be executed later, so bind loc now
         do (loc) ->
-            animate_queue( () ->
+            #animate_queue( () ->
                 fc = get_field(loc)
                 fcc = lift_card(fc)
                 blank_card(fc)
                 tgti = capture_dest(fcc.data('rank'), caps)
 
                 move_now(fcc, tgti.offset(), settle_card(tgti, fcc))
-            )
+            #)
 
+# Move card (element, not location) to player's discards
 capture_single = (card, player) ->
     caps = if player == playerid then $("#playerCaptures") else $("#opponentCaptures")
     tgt = capture_dest(card.data('rank'), caps)
     card.attr('id', '')
-    move_card(card, tgt.offset(), settle_card(tgt, card))
+    move_now(card, tgt.offset(), settle_card(tgt, card))
+
+
+################################################################################################
+# Handlers for server events
+
+# Plant the player's dragged card if necessary
+self_plant_card = (field) ->
+    dest = get_field(field)
+    if (dest.data('suit') != "empty")
+        # A capture, nothing to do
+        return
+    fc = $("#flyingCard")
+    # card has attributes and junk, so manually copy over
+    # the important stuff
+    c =
+        'img': fc.attr('src'),
+        'suit': fc.data("suit"),
+        'rank': fc.data("rank")
+    clear_suit(dest)
+    set_card(dest, c)
+    dest.data('id', field); #  TODO: Maybe strip these out? They don't seem useful
+    dest.attr('id', "field_" + field)
+    dest.removeClass("handCard").addClass("fieldCard")
+    # TODO: blank rather than remove (well, the original, not the flying ver)
+    fc.remove()
+
+opponent_place_card = (field, card) ->
+    animate_queue( () ->
+        hand = opponent_play_order.pop()
+        el = extract_card(get_opphand(hand))
+        set_card(el, card)
+
+        place_card(el, field)
+    )
+
+capture_play = (location, player) ->
+    animate_queue( () ->
+        capture_cards(location, player)
+        capture_single($("#flyingCard"), player)
+    )
+
 
 # Lift the card off the top of the deck, blank the card underneath, return the new
 # handle
@@ -299,37 +304,20 @@ deck_lift = () ->
     # set_card(dcc, data.deckcard)
     dcc
 
-deck_place = (location, card) ->
-    dcc = deck_lift()
-    tgt = get_field(location)
-    tgtpos = tgt.offset()
-    # leaving it on the field somewhere
-    cb = () ->
-        clear_suit(tgt)
-        set_card(tgt, card)
-        dcc.remove()
-    move_card(dcc, tgtpos, cb)
+deck_place = (location) ->
+    animate_queue( () ->
+        dcc = deck_lift()
+        place_card(dcc, location)
+    )
 
 deck_capture = (locations, player) ->
-    # Queue rather than execute directly because the deck_lift might catch the card dropped by opponent_place_card
-    # because the callback. That gets ugly.
-    # Fly the card to the temporary location on top of a captured card
-    dcc = $("#flyingDeckCard")
-    # flyingCard won't be null in case of a :deck_match
-    if (dcc.length == 0)
-        dcc = deck_lift()
-        target = get_field(locations[0])
-        tgt_pos = target.offset()
-        tgt_pos.top += 25
-        tgt_pos.left += 25
-
-        move_card(dcc, tgt_pos)
-        animate_gate()
-
-    capture_single(dcc, player)
-
-    # Take all the captures
-    capture_cards(locations, player)
+    animate_queue( () ->
+        dcc = $("#flyingCard")
+        # flyingCard won't be null in case of a :deck_match
+        capture_single(dcc, player)
+        # Take all the captures
+        capture_cards(locations, player)
+    )
 
 draw_card = (card) ->
     set_card(get_deckcard(), card)
@@ -346,7 +334,6 @@ koikoi_prompt = (yaku) ->
     $("#koikoiPrompt").css('display', 'block')
     screen_on()
 
-
 run_event = (data) ->
     console.log(data.type)
     console.log(data)
@@ -361,20 +348,16 @@ run_event = (data) ->
                 opponent_place_card(data.location, data.card)
             else
                 # Plant the card
-                self_place_card(data.location)
+                self_plant_card(data.location)
         when 'take_card'
-            #if (data.player != playerid) {
-            #    opponent_fly_card(data.location, data.card)
-            #}
-            capture_cards(data.location, data.player)
-            capture_single($("#flyingCard"), data.player)
+            capture_play(data.location, data.player)
         when 'draw_card'
             draw_card(data.card)
             # Not symmetrical with play_card/take_card
         when ':draw_match'
             deckselect_enable(data.card)
         when 'draw_place'
-            deck_place(data.location, data.card)
+            deck_place(data.location)
         when 'draw_capture'
             deck_capture(data.location, data.player)
         when ':koikoi'
@@ -450,6 +433,31 @@ board_init = (state) ->
     else
         enable_hand()
 
+
+selectedCard = null
+click_hand = (card) ->
+    if (selectedCard == card)
+        selectedCard = null
+    else
+        selectedCard = card
+    # Set up highlights and drag targets and whatever
+
+click_field = (field) ->
+    if selectedCard == null
+        return
+    handID = get_hand_id(selectedCard)
+    fieldID = get_field_id(field)
+    card = extract_card(selectedCard)
+    animate_queue(() ->
+        place_card(card, fieldID))
+    selectedCard = null
+    data =
+        'type': 'place'
+        'hand': handID
+        'field': fieldID
+    wsock.send(JSON.stringify(data))
+    animate_gate()
+
 # User took one of their cards and placed it, either on a matched card on an
 # empty space. 
 # handID: ID of the card taken (-1 if it's from the deck, special case)
@@ -506,6 +514,10 @@ init = ->
             place(ui.draggable.data("id"), $(this).data("id"),
                 ui.draggable, ui.position)
         , 'disabled': true})
+    $(".fieldCard").click(() ->
+        click_field($(this)))
+    $("#playerHand > .handCard").click(() ->
+        click_hand($(this)))
 
     # handle dragging and hovering cards
     # On hover highlight the cards that match the highlighted card
@@ -527,6 +539,7 @@ init = ->
                 dragging = false
                 draggingthing.css('opacity', 1.0)
                 )
+
     $("#playerHand > .handCard").hover(() ->
         # start hover handler, mark the suit
             suit = $(this).data('suit')
