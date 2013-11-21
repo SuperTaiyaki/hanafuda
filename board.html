@@ -10,8 +10,6 @@
 
         <script type="text/javascript" src="/scripts/jquery.js">
         </script>
-        <script type="text/javascript" src="/scripts/jquery-ui.js">
-        </script>
         <!-- Tacking on GameID should hopefully stop opera caching this... -->
         <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
 
@@ -71,14 +69,16 @@
 
             /* 620px calculated from a full hand */
             div.hand {clear:left; float:left; padding: 10px;
-                border: 1px solid black; width: 650px; height: 128px;}
+                border: 1px solid black; width: 650px; height: 150px;}
             div.captures {float:left; margin-left: 10px;margin-bottom: -80%;
                 margin-right: -80%;}
             div#deck {z-index: -1;}
 
-            img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
+            img.handCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px; margin-top:
+                20px;margin-bottom: 10px}
             img.fieldCard{padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px;
                 z-index: 5;}
+            img.selected {margin-bottom: 30px;margin-top: 0px}
             img.deckCard {padding-left:5px;padding-right:5px;padding-top:10px;padding-bottom:10px}
             img.capCard {margin-right: -30px}
             .cardHighlight {background-color: #807575 !important}

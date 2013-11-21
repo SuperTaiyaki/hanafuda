@@ -54,12 +54,10 @@ screen_off = () ->
 enable_hand = () ->
     $("#playerHand").removeClass("handDisabled")
     $("#opponentHand").addClass("handDisabled")
-    $("#playerHand > .handCard").draggable("option", "disabled", false)
 
 disable_hand = () ->
     $("#opponentHand").removeClass("handDisabled")
     $("#playerHand").addClass("handDisabled")
-    $("#playerHand > .handCard").draggable("option", "disabled", true)
 
 
 # Strip all suits off a card
@@ -132,46 +130,18 @@ get_hand_id = (card) ->
 get_field_id = (field) ->
     field.attr('id').slice(6, 8)
 
-# enter deck selection mode, where there are multiple options from the field to
-# match a card from the deck. The player can only take the deck card and match
-# it to field cards of the same suit.
-#
-deck_select = false
-deckselect_enable = (card) ->
-    $("#deckCard").draggable("option", "disabled", false)
-    $("#deckCard").addClass("cardHighlight")
-    unmark_field()
-    month = card.suit
-    mark_field(month, false)
-    # should disable highlight and dragging for the main cards
-    $(".fieldCard:not(." + month + ")").droppable("option", "disabled", true)
-    $(".fieldCard." + month).droppable("option", "disabled", false)
-    $(".handCard").draggable("option", "disabled", true)
-    deck_select = true
-
-deckselect_disable = (card) ->
-    # restore the old state
-    $("#deckCard").attr('src', "/img/back.gif")
-    $("#deckCard").removeClass("cardHighlight")
-    $("#deckCard").draggable("option", "disabled", true)
-    $(".fieldCard").droppable("option", "disabled", false)
-    $(".handCard").draggable("option", "disabled", false)
-    deck_select = false
-    unmark_field()
-
 
 # Make field cards of the matching suit into drop targets
 drag_targets = (suit, blank) ->
     if (deck_select)
         return; # don't bother it
-    $(".fieldCard").droppable("option", "disabled", true)
     if (suit == "")
         return
     droptgts = $(".fieldCard." + suit)
-    if (droptgts.length > 0)
-        droptgts.droppable("option", "disabled", false)
-    else
-        $(".fieldCard.empty").droppable("option", "disabled", false)
+    #if (droptgts.length > 0)
+    #    droptgts.droppable("option", "disabled", false)
+    #else
+    #    $(".fieldCard.empty").droppable("option", "disabled", false)
 
 # Highlight field cards of the matching suit
 mark_field = (month, blank) ->
@@ -225,7 +195,6 @@ settle_card = (container, card) ->
         card.css('position', 'static')
         card.attr('id', '')
         card.removeClass().addClass("card capCard")
-        #card.draggable("option", "disabled", true)
 
 
 # Move all cards from [locations] to player's discards
@@ -292,7 +261,6 @@ capture_play = (location, player) ->
         capture_single($("#flyingCard"), player)
     )
 
-
 # Lift the card off the top of the deck, blank the card underneath, return the new
 # handle
 # Not useful if the deck card isn't flipped up
@@ -301,11 +269,13 @@ deck_lift = () ->
     dcc = lift_card(dc)
     blank_card(dc)
     dc.attr('src', '/img/back.gif')
-    # set_card(dcc, data.deckcard)
     dcc
 
 deck_place = (location) ->
+
     animate_queue( () ->
+        if $("#flyingCard").length > 0
+            return
         dcc = deck_lift()
         place_card(dcc, location)
     )
@@ -344,7 +314,7 @@ run_event = (data) ->
             start_game()
         # Hand -> Field
         when 'play_card'
-            if (data.player != playerid)
+            if data.player != playerid
                 opponent_place_card(data.location, data.card)
             else
                 # Plant the card
@@ -378,7 +348,7 @@ run_event = (data) ->
         when 'results'
             $("#results").html(data.data)
             $("#results").css('display', 'block')
-            $("#results").draggable(); #if the user wants to see stuff
+            # $("#results").draggable(); #if the user wants to see stuff
             screen_on()
         else
             alert("Unknown message: " + data.type)
@@ -436,18 +406,32 @@ board_init = (state) ->
 
 selectedCard = null
 click_hand = (card) ->
+    if deck_select
+        return null
+    $("img.selected").removeClass("selected")
     if (selectedCard == card)
         selectedCard = null
     else
         selectedCard = card
+        selectedCard.addClass("selected")
     # Set up highlights and drag targets and whatever
 
 click_field = (field) ->
     if selectedCard == null
+        alert("No selected card")
         return
-    handID = get_hand_id(selectedCard)
+
+    if field.data("suit") != "empty" && selectedCard.data("suit") != field.data("suit")
+        alert("Suit mismatch")
+        return null
+    if deck_select
+        handID = -1
+        card = deck_lift()
+        deckselect_disable()
+    else
+        handID = get_hand_id(selectedCard)
+        card = extract_card(selectedCard)
     fieldID = get_field_id(field)
-    card = extract_card(selectedCard)
     animate_queue(() ->
         place_card(card, fieldID))
     selectedCard = null
@@ -457,6 +441,29 @@ click_field = (field) ->
         'field': fieldID
     wsock.send(JSON.stringify(data))
     animate_gate()
+
+# enter deck selection mode, where there are multiple options from the field to
+# match a card from the deck. The player can only take the deck card and match
+# it to field cards of the same suit.
+#
+deck_select = false
+deckselect_enable = (card) ->
+    $("#deckCard").addClass("cardHighlight")
+    unmark_field()
+    month = card.suit
+    $("#deckCard").data("suit", month)
+    mark_field(month, false)
+    # should disable highlight and dragging for the main cards
+    selectedCard = $("#deckCard")
+    deck_select = true
+
+deckselect_disable = (card) ->
+    # restore the old state
+    $("#deckCard").attr('src', "/img/back.gif")
+    $("#deckCard").removeClass("cardHighlight")
+    deck_select = false
+    unmark_field()
+
 
 # User took one of their cards and placed it, either on a matched card on an
 # empty space. 
@@ -469,6 +476,10 @@ place = (handID, fieldID, el, tgt) ->
     unmark_field()
     if (deck_select)
         el = lift_card(el)
+
+        dc = get_deckcard()
+        blank_card(dc)
+        dc.attr('src', "/img/back.gif")
     else
         extract_card(el)
 
@@ -510,35 +521,10 @@ init = ->
     ws_init()
     $("#deckCard").data('id', -1)
 
-    $(".fieldCard").droppable({drop: (event, ui) ->
-            place(ui.draggable.data("id"), $(this).data("id"),
-                ui.draggable, ui.position)
-        , 'disabled': true})
     $(".fieldCard").click(() ->
         click_field($(this)))
     $("#playerHand > .handCard").click(() ->
         click_hand($(this)))
-
-    # handle dragging and hovering cards
-    # On hover highlight the cards that match the highlighted card
-    # On drag lock the highlight
-    # On drag release or unhover remove the highlight
-    draggingthing = 0 # Better than having it be global... hopefully this means the 
-    # references inside the two lambdas will point here
-    $("#playerHand > .handCard").draggable(
-            helper: 'clone'
-            # TODO: Clean up nasty global window.dragging business
-            # So in here, 'this' is apparently the base object while ui.helper is the flying bit
-            start: (event, ui) ->
-                dragging = true; #need to mark the original somehow
-                month = $(this).data('suit')
-                draggingthing = ui.helper # $(this)
-                draggingthing.css('opacity', 0.2)
-                drag_targets(month, true)
-            stop: () ->
-                dragging = false
-                draggingthing.css('opacity', 1.0)
-                )
 
     $("#playerHand > .handCard").hover(() ->
         # start hover handler, mark the suit
@@ -548,9 +534,6 @@ init = ->
             # stop hover handler
             unmark_field()
             )
-    $("#deckCard").draggable(
-        helper: 'clone',
-        disabled: true)
     log("Finished init")
 
 
