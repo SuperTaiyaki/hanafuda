@@ -1,6 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
+<!DOCTYPE html>
 <html>
 <head>
 <title>Hanafuda Lobby</title>
@@ -13,6 +11,10 @@ socket = "${socket}/ws";
 
 <body>
 <p><b>Currently under testing. Expect things to break.</b></p>
+<div id="websockets_message" style="display:none;">
+    <b>Error: </b>Your browser doesn't support websockets. Check a <a href="http://caniuse.com/websockets">compatibility list</a> and try again with something that does.
+</div>
+<div id="controls">
 <form action="aaaaaaaa" method="get">
 Name: <input id="namebox" type="text" name="name" value="${data['name']}" onblur="set_name();" />
 <input type="button" name="random" value="New random name" onclick="new_name();return false;" />
@@ -25,14 +27,13 @@ Name: <input id="namebox" type="text" name="name" value="${data['name']}" onblur
 <p>Waiting opponents:</p>
 <div id="update_block">
 <ul id="gamelist">
-${data['gamelist']}
+    <li>Loading...</li>
 </ul>
 </div>
-
+</div>
 <p>An explanation of the rules can be found at
 <a href="http://hanafubuki.org/rules.html">www.hanafubuki.org</a>. To play a card
-drag it onto the card you wish to capture or an empty space (valid targets will
-be highlighted). Current house rules:
+click it then the field location (card or empty spot) to match. Current house rules:
 
 <ul>
 <li>Score is doubled if you have over 7 points.</li>

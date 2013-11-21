@@ -52,8 +52,11 @@ screen_off = () ->
 # Set the player's hand as active or inactive. This currently involves a grey
 # shade behind the disabled player and dragging is disabled.
 enable_hand = () ->
-    $("#playerHand").removeClass("handDisabled")
-    $("#opponentHand").addClass("handDisabled")
+    # Delay until the animation is over, to match the actual enabled/disabled state
+    animate_queue( () ->
+        $("#playerHand").removeClass("handDisabled")
+        $("#opponentHand").addClass("handDisabled")
+    )
 
 disable_hand = () ->
     $("#opponentHand").removeClass("handDisabled")
@@ -130,34 +133,20 @@ get_hand_id = (card) ->
 get_field_id = (field) ->
     field.attr('id').slice(6, 8)
 
-
-# Make field cards of the matching suit into drop targets
-drag_targets = (suit, blank) ->
-    if (deck_select)
-        return; # don't bother it
-    if (suit == "")
-        return
-    droptgts = $(".fieldCard." + suit)
-    #if (droptgts.length > 0)
-    #    droptgts.droppable("option", "disabled", false)
-    #else
-    #    $(".fieldCard.empty").droppable("option", "disabled", false)
-
 # Highlight field cards of the matching suit
-mark_field = (month, blank) ->
+mark_field = (month, blank, mode) ->
     if (dragging || deck_select)
         return
     tgts = $("#fieldCards ." + month)
     if (tgts.length > 0)
-        tgts.addClass('cardHighlight')
+        tgts.addClass(mode)
     else if (blank)
-        $(".fieldCard.empty").addClass('cardHighlight')
+        $(".fieldCard.empty").addClass(mode)
 
 # Clear field highlights
-unmark_field = () ->
+unmark_field = (mode) ->
     if (!dragging && !deck_select)
-        $(".fieldCard.cardHighlight").removeClass('cardHighlight')
-        drag_targets("", false)
+        $(".fieldCard." + mode).removeClass(mode)
 
 # ANIMATION UTILITY FUNCTIONS. NOT DELAYED. WRAP IN AN ANIMATE_QUEUE
 
@@ -406,23 +395,24 @@ board_init = (state) ->
 
 selectedCard = null
 click_hand = (card) ->
-    if deck_select
+    if deck_select || animating
         return null
     $("img.selected").removeClass("selected")
+    unmark_field('cardTarget')
     if (selectedCard == card)
         selectedCard = null
     else
         selectedCard = card
         selectedCard.addClass("selected")
-    # Set up highlights and drag targets and whatever
+        month = card.data("suit")
+        mark_field(month, true, 'cardTarget')
 
 click_field = (field) ->
     if selectedCard == null
-        alert("No selected card")
         return
 
+    unmark_field('cardTarget')
     if field.data("suit") != "empty" && selectedCard.data("suit") != field.data("suit")
-        alert("Suit mismatch")
         return null
     if deck_select
         handID = -1
@@ -449,10 +439,10 @@ click_field = (field) ->
 deck_select = false
 deckselect_enable = (card) ->
     $("#deckCard").addClass("cardHighlight")
-    unmark_field()
+    unmark_field('cardHighlight')
     month = card.suit
     $("#deckCard").data("suit", month)
-    mark_field(month, false)
+    mark_field(month, false, 'cardTarget')
     # should disable highlight and dragging for the main cards
     selectedCard = $("#deckCard")
     deck_select = true
@@ -462,7 +452,8 @@ deckselect_disable = (card) ->
     $("#deckCard").attr('src', "/img/back.gif")
     $("#deckCard").removeClass("cardHighlight")
     deck_select = false
-    unmark_field()
+    unmark_field('cardHighlight')
+    unmark_field('cardTarget')
 
 
 # User took one of their cards and placed it, either on a matched card on an
@@ -514,6 +505,8 @@ ws_init = () ->
     wsock.onmessage = (evt) ->
         data = JSON.parse(evt.data)
         run_event evt for evt in data
+    wsock.onerror = (evt) ->
+        alert("Websocket error: " + evt.data)
     window.wsock = wsock
 
 init = ->
@@ -529,10 +522,10 @@ init = ->
     $("#playerHand > .handCard").hover(() ->
         # start hover handler, mark the suit
             suit = $(this).data('suit')
-            mark_field(suit, true)
+            mark_field(suit, true, 'cardHighlight')
         ,() ->
             # stop hover handler
-            unmark_field()
+            unmark_field('cardHighlight')
             )
     log("Finished init")
 

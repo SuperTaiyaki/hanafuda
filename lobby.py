@@ -172,6 +172,7 @@ class Lobby(object):
     def __init__(self):
         self.waiting = {} # Need to make sure this doesn't build up...
         self.dispatcher = Dispatcher()
+        self.listeners = []
 
     def get_game(self):
         return cherrypy.session['game']
@@ -179,6 +180,16 @@ class Lobby(object):
     @cherrypy.expose
     def set_name(self, name):
         cherrypy.session['player'].set_name(name)
+
+    def add_listener(self, socket):
+        self.listeners.append(socket)
+    
+    def remove_listener(self, socket):
+        self.listeners.remove(socket)
+    def init_client(self, socket):
+        gamelist = self.gamelist_render()
+        data = json.dumps({'type': 'games', 'games': gamelist})
+        socket.send(data)
 
     def get_player(self):
         return cherrypy.session['player']
@@ -195,8 +206,11 @@ class Lobby(object):
     def game_alert(self):
         gamelist = self.gamelist_render()
         data = json.dumps({'type': 'games', 'games': gamelist})
-        for l in listeners:
-            l.send(data) if l else '' # Might have become None
+        for l in self.listeners:
+            try:
+                l.send(data) if l else '' # Might have become None
+            except e:
+                self.listeners.remove(l)
 
     def cancel(self, ids):
         deleted = False
@@ -216,9 +230,6 @@ class Lobby(object):
         player = cherrypy.session['player']
 
         data = {'name': player.get_name()}
-        print(data)
-        data['gamelist'] = self.gamelist_render()
-        print(data)
         data['score'] = player.get_score()
 
         return self.tmpl.render(data = data, socket = config.WEBSOCKET_URL)
@@ -299,25 +310,21 @@ class Lobby(object):
             raise cherrypy.HTTPRedirect("/")
         return cherrypy.session['match'].show_results(cherrypy.session['slot'])
 
-listeners = []
-
 class EWS(WebSocket):
     def received_message(self, message):
-        print("Received message")
         data = json.loads(message.data)
         if data['type'] == 'new_name':
             name = generate_name()
             self.send(json.dumps({'type': 'name', 'name': name}))
+        elif data['type'] == 'init':
+            get_lobby().init_client(self)
 
     def opened(self):
-        #print("WS Connection opened")
-        listeners.append(self)
+        get_lobby().add_listener(self)
     def notify(self, data):
         self.send(json.dumps(data), False)
-        #print("Added listener")
     def closed(self, code, reason = None):
-        listeners.remove(self)
-        #print("Removed listener")
+        get_lobby().remove_listener(self)
 
 
 class GameWS(WebSocket):

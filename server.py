@@ -111,7 +111,7 @@ class Server(object):
 
         score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner)
         # Pull out the numerical score, don't need the rest of the data
-        self.dispatcher.end_round(self.game.winner, score.get_score())
+        self.dispatcher.end_round(self.game.winner, self.game.multiplier[self.game.winner] * score.get_score())
         next_ids = self.dispatcher.next_round()
 
         results_1 = self.score(self.game, player, next_ids[player])

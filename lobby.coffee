@@ -1,11 +1,13 @@
-$(document).ready = ->
-    if (!'WebSocket' in window)
-        alert("No websocket support. Not going to work.")
+$(document).ready(() ->
+    if !'WebSocket' in window
+        $("#websockets_message").css('display', 'block')
+        $("#controls").css('display', 'none')
+)
 
 wsconn = new WebSocket(socket)
 
 wsconn.onopen = ->
-    "" # What's the 'pass' equivalent?
+    wsconn.send(JSON.stringify({type: 'init'}))
 
 wsconn.onmessage = (data) ->
     json = JSON.parse(data.data)
