@@ -5,6 +5,6 @@
 
 ./build
 rsync -ripL --filter=': deploy_filter' . sakazuki
-export GIT_DIR=sakazuki
+export GIT_DIR=sakazuki/.git	
 git commit -a
 

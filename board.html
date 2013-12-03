@@ -14,6 +14,7 @@
         <script type="text/javascript" src="/scripts/hanafuda.js?${gameid}"></script>
 
         <style>
+            body {background-image:url('/img/bg.jpg'); background-repeat: no-repeat; background-size: 100%}
             div#koikoiPrompt {padding-left: 100px; padding-right:
                 100px; padding-top: 100px; padding-bottom:
                 100px;
@@ -87,7 +88,7 @@
             .card {background-color: #DDD}
             .dragging {opacity:0.5}
         </style>
-        <title>AJAX Hanafuda</title>
+        <title>Sakazuki</title>
     </head>
 <body>
 
@@ -137,10 +138,12 @@
         Score: <span id="txtScore">0</span><br />
         Opponent's score: <span id="txtOppScore">0</span><br />
         Game ID: <a href="#" onclick="javascript:showLink();"><span id="txtGameId">-1</span></a><br />
+% if DEBUG:
         <a href="#" onclick="javascript:win();">Win</a><br />
         <a href="#" onclick="javascript:draw();">Draw</a><br />
         <a href="/">Lobby</a>
         <a href="/results">Results</a>
+% endif
     </div>
     <!-- middle R: scores, current multiplier, other status -->
 

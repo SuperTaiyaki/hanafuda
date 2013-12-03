@@ -2,6 +2,7 @@
 import os
 
 DEBUG=False
+DEBUG=True
 
 ASSETS_PATH=os.environ['OPENSHIFT_REPO_DIR']
 DOMAIN=os.environ['OPENSHIFT_APP_DNS']
@@ -16,3 +17,4 @@ else:
 SERVER_PORT=int(os.environ['OPENSHIFT_PYTHON_PORT'])
 SERVER_IP=os.environ['OPENSHIFT_PYTHON_IP']
 
+db_name = 'players.db'
