@@ -2,6 +2,13 @@ $(document).ready(() ->
     if !'WebSocket' in window
         $("#websockets_message").css('display', 'block')
         $("#controls").css('display', 'none')
+    # Checking for localStorage would be a good idea, but if websockets are available it's probably fine
+    
+
+    if $("#user_id").val().length == 23
+        window.localStorage.setItem("loginKey", $("#user_id").val())
+    else if window.localStorage.getItem('loginKey') != null
+        $("#user_id").val(window.localStorage.getItem("loginKey"))
 )
 
 wsconn = new WebSocket(socket)

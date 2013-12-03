@@ -7,10 +7,12 @@ from mako.template import Template
 import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
+from ws4py.exc import WebSocketException, StreamClosed
 
 import server
 import cards
 import config
+import storage
 
 INITIAL_POINTS = 1000
 
@@ -28,17 +30,34 @@ class Player(object):
     def set_name(self, name):
         self.name = name
 
+    def get_id(self):
+        return self.id
+
+    def set_id(self, id):
+        self.id = id
+
     def get_score(self):
         return self.points
 
     def add_score(self, points):
+        # Minimise dodginess
+        if self.id:
+            self.load(self.id)
         self.points += points
+        if self.id:
+            self.save()
         return self.points
+
+    def save(self):
+        storage.save_user(self)
+
+    def load(self, key):
+        self.id, self.name, self.points = storage.load_user(key)
 
 class Match(object):
     template = Template(filename="settlement.html")
     def __init__(self, dispatcher):
-        self.rounds = 2
+        self.rounds = 3
         self.current_round = 0
         self.rules = None
         self.rate = 1
@@ -52,9 +71,6 @@ class Match(object):
         self.game = server.Server(self)
         self.ids = self.dispatcher.register(self)
 
-    def __del__(self):
-        print("MATCH object deleted------------------")
-
     def set_player(self, player, id):
         self.players[player] = id
 
@@ -63,6 +79,7 @@ class Match(object):
             self.scores.append((0, 0))
             self.next_dealer ^= 1
         else:
+            # Winner will be 0 or 1
             self.scores.append(((winner^1)*score, winner*score))
             self.next_dealer = winner
 
@@ -183,7 +200,7 @@ class Lobby(object):
 
     def add_listener(self, socket):
         self.listeners.append(socket)
-    
+
     def remove_listener(self, socket):
         self.listeners.remove(socket)
     def init_client(self, socket):
@@ -209,7 +226,7 @@ class Lobby(object):
         for l in self.listeners:
             try:
                 l.send(data) if l else '' # Might have become None
-            except e:
+            except Exception as e:
                 self.listeners.remove(l)
 
     def cancel(self, ids):
@@ -229,10 +246,22 @@ class Lobby(object):
             cherrypy.session['player'] = p
         player = cherrypy.session['player']
 
-        data = {'name': player.get_name()}
-        data['score'] = player.get_score()
+        data = {'name': player.get_name(),
+                'score': player.get_score(),
+                'id': player.get_id()}
 
         return self.tmpl.render(data = data, socket = config.WEBSOCKET_URL)
+
+    @cherrypy.expose
+    def user(self, **args):
+        if 'create' in args:
+            cherrypy.session['player'].save()
+            pass
+        elif 'load' in args and args['user_id']:
+            cherrypy.session['player'].load(args['user_id'])
+            pass
+
+        raise cherrypy.HTTPRedirect("/")
 
     @cherrypy.expose
     def new_game(self, id = None, lobby = True):
@@ -279,7 +308,7 @@ class Lobby(object):
     def connect_client(self, pipe, id):
         match, player = self.dispatcher.find(id)
         if match is None:
-            return None
+            return (None, None)
         game = match.get_game()
         game.connect(player, pipe)
         return game, player
@@ -302,7 +331,8 @@ class Lobby(object):
         if 'game' not in cherrypy.session:
             return 'Error: No active game'
         deck = ['/img/' + x.image for x in cards.DECK]
-        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'], socket = config.WEBSOCKET_URL)
+        return self.board_tmpl.render(images = deck, gameid = cherrypy.session['game_id'], socket =
+                config.WEBSOCKET_URL, DEBUG = config.DEBUG)
 
     @cherrypy.expose
     def results(self):
@@ -333,13 +363,19 @@ class GameWS(WebSocket):
         self.game = None
     def received_message(self, message):
         print("MESSAGE: " + message.data)
-        data = json.loads(message.data)
-        if self.game is None:
-            # Get a hold of the dispatcher
-            self.game, self.player = get_lobby().connect_client(self, data['game_id'])
-            print("Connected player %s" % self.player)
-        else:
-            self.game.message(self.player, data)
+        try:
+            data = json.loads(message.data)
+            if self.game is None:
+                # Get a hold of the dispatcher
+                self.game, self.player = get_lobby().connect_client(self, data['game_id'])
+                print("Connected player %s" % self.player)
+            else:
+                self.game.message(self.player, data)
+        except WebSocketException as e:
+            pass
+        except StreamClosed as e:
+            self.closed(0)
+
     def opened(self):
         pass
     def closed(self, code, reason = None):

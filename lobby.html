@@ -15,12 +15,26 @@ socket = "${socket}/ws";
     <b>Error: </b>Your browser doesn't support websockets. Check a <a href="http://caniuse.com/websockets">compatibility list</a> and try again with something that does.
 </div>
 <div id="controls">
-<form action="aaaaaaaa" method="get">
+<form action="#" method="get">
 Name: <input id="namebox" type="text" name="name" value="${data['name']}" onblur="set_name();" />
 <input type="button" name="random" value="New random name" onclick="new_name();return false;" />
 </form>
 
 <p>Points: ${data['score']}</p>
+
+<form action="/user" method="post">
+% if not data['id']:
+<p>ID not registered. Registering will allow you to load your score and view a log of game results (no details
+required).</p>
+    <input type="submit" name="create" value="Register" /><br />
+    <input id="user_id" type="text" name="user_id" value="" />
+    <input type="submit" name="load" value="Log in" />
+% else:
+    <input type="hidden" name="user_id" id="user_id" value="${data['id']}" />
+<p>User ID: ${data['id']|h}<br />
+Don't lose this, it can't be recovered.</p>
+% endif
+</form>
 
 <p><a href="/new_game">Create new game</a></p>
 
@@ -40,7 +54,7 @@ click it then the field location (card or empty spot) to match. Current house ru
 <li>Flower viewing and Moon viewing are both active.</li>
 <li>Special draws don't score. They're silently re-drawn in the background.</li>
 </ul>
-Rule variants may be made available later. Games are currently set to only two hands.</p>
+Rule variants may be made available later. Games are currently set to only three hands.</p>
 
 <p>This has been tested in Opera 12.15 and Chromium 30.</p>
 </body>
