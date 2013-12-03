@@ -21,6 +21,7 @@ class GameFullException(Exception):
 # Probably not an appropriate name any more...
 # Layer between the Game instance and the frontend JS side
 class Server(object):
+    results_tmpl = Template(filename="results.html")
 
     def __init__(self, dispatcher, dealer = -1, options = None):
         self.game = game.Game()
@@ -109,9 +110,9 @@ class Server(object):
         events_self = []
         events_other = []
 
-        score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner)
+        score = 0 if self.game.winner == -1 else self.game.get_score(self.game.winner).get_score() * self.game.multiplier[self.game.winner]
         # Pull out the numerical score, don't need the rest of the data
-        self.dispatcher.end_round(self.game.winner, self.game.multiplier[self.game.winner] * score.get_score())
+        self.dispatcher.end_round(self.game.winner, score)
         next_ids = self.dispatcher.next_round()
 
         results_1 = self.score(self.game, player, next_ids[player])
@@ -138,6 +139,7 @@ class Server(object):
         except game.GameError as e:
             print("Game exception...")
             print(e.__repr__())
+            raise
 
         events_self = []
         events_other = []
@@ -171,8 +173,6 @@ class Server(object):
 
     @cherrypy.expose # testing only
     def score(self, g, player, next_game):
-        # TODO: Move this elsewhere
-        tmpl = Template(filename="results.html")
         ctx = {}
         if g.winner == -1:
             ctx['result'] = "Draw"
@@ -191,7 +191,7 @@ class Server(object):
         if next_game:
             ctx['next_game'] = next_game
         # print ctx
-        return tmpl.render(c = ctx)
+        return self.results_tmpl.render(c = ctx)
 
 
     @cherrypy.expose
@@ -267,20 +267,30 @@ class Server(object):
             self.dispatcher.abort_game()
 
     def message(self, player, data):
-        if data['type'] == 'place':
-            self.place(player, int(data['hand']), int(data['field']))
-        elif data['type'] == 'koikoi':
-            self.koikoi(player, True)
-        elif data['type'] == 'end_game':
-            self.koikoi(player, False)
+        try:
+            if data['type'] == 'place':
+                self.place(player, int(data['hand']), int(data['field']))
+            elif data['type'] == 'koikoi':
+                self.koikoi(player, True)
+            elif data['type'] == 'end_game':
+                self.koikoi(player, False)
 
-        if not config.DEBUG:
-            return
-        # Debugging only!
-        elif data['type'] == 'win':
-            # Instant hanamizake
-            self.game.captures[player].extend([8, 32])
-        elif data['type'] == 'draw':
-            # Doesn't work so well... probably need to do this every turn
-            del self.game.captures[player][:]
-
+            if not config.DEBUG:
+                return
+            # Debugging only!
+            elif data['type'] == 'win':
+                # Instant hanamizake
+                self.game.captures[player].extend([8, 32])
+            elif data['type'] == 'draw':
+                # Doesn't work so well... probably need to do this every turn
+                del self.game.captures[player][:]
+                self.game.scores[player].update([])
+        except game.GameError as e:
+            # Should probably try to HTML escape this...
+            message = json.dumps([{'type': 'error', 'text': 
+"""
+An error has occurred. You may be able to continue this game by refreshing the page.<br />
+Error: %s
+""" % str(e)}])
+            self.channels[player].send(message)
+            # Might have to disconnect the socket here... error recovery basically doesn't work

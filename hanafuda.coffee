@@ -8,20 +8,27 @@ log = (msg) ->
 
 animation_queue = []
 animation_frame = []
-animating = false; # Really don't like trying to block this way...
+animating = false # Really don't like trying to block this way...
+field_locked = false
 
 animate_next = () ->
     if (animation_queue.length == 0)
         animating = false
         return
     animating = true
+    
+    loop
+        events = animation_queue.shift()
+        break if events or animation_queue.length == 0
+    if not events
+        animating = false
+        return
 
-    events = animation_queue.shift()
     ev() for ev in events
 
     setTimeout(() ->
             animate_next()
-        , 1000)
+        , 750)
 
 animate_gate = () ->
     if (animation_frame.length == 0)
@@ -42,6 +49,13 @@ move_now = (el, target, callback) ->
 animate_queue = (fn) ->
     animation_frame.push(fn)
 
+# Insert at the end of the queue, rather than into the next block
+animate_inject = (fn) ->
+    if not animating
+        fn()
+    else
+        animation_queue[-1].push(fn)
+
 # Raise a screen onto the playing area to block interaction. Used for dialogs.
 screen_on = () ->
     $("#screen").css('display', 'block')
@@ -56,11 +70,13 @@ enable_hand = () ->
     animate_queue( () ->
         $("#playerHand").removeClass("handDisabled")
         $("#opponentHand").addClass("handDisabled")
+        field_locked = false
     )
 
 disable_hand = () ->
     $("#opponentHand").removeClass("handDisabled")
     $("#playerHand").addClass("handDisabled")
+    field_locked = true
 
 
 # Strip all suits off a card
@@ -112,11 +128,18 @@ lift_card = (el) ->
 
 # Pull a card out of the layout (the real card) 
 extract_card = (el) ->
-    pos = el.offset()
-    el.appendTo('body')
-    el.css('top', pos.top)
-    el.css('left', pos.left)
-    el.css('position', 'absolute')
+    #pos = el.offset()
+    #clone = el.clone(true).appendTo('body')
+    #el.appendTo('body')
+    #clone.css('top', pos.top)
+    #clone.css('left', pos.left)
+    #clone.css('position', 'absolute')
+    clone = lift_card(el)
+    # Blank out the old card
+    el.attr('src', '/img/blank.gif')
+    el.removeClass("selected card")
+    el.off()
+    return clone
 
 get_hand = (id) ->
     $("#player_" + id)
@@ -133,11 +156,14 @@ get_hand_id = (card) ->
 get_field_id = (field) ->
     field.attr('id').slice(6, 8)
 
+get_suit = (suit) ->
+    return $("#fieldCards ." + suit)
+
 # Highlight field cards of the matching suit
 mark_field = (month, blank, mode) ->
     if (dragging || deck_select)
         return
-    tgts = $("#fieldCards ." + month)
+    tgts = get_suit(month)
     if (tgts.length > 0)
         tgts.addClass(mode)
     else if (blank)
@@ -261,7 +287,6 @@ deck_lift = () ->
     dcc
 
 deck_place = (location) ->
-
     animate_queue( () ->
         if $("#flyingCard").length > 0
             return
@@ -332,6 +357,11 @@ run_event = (data) ->
                 setTimeout(() ->
                     $("#alert").slideUp('fast')
                 , 1000))
+        when 'error'
+            screen_on()
+            $("#txtAlert").html(data.text)
+            # slideUp chained onto a slideDown
+            $("#alert").slideDown('fast')
         when 'game_end'
             wsock.close()
         when 'results'
@@ -395,7 +425,7 @@ board_init = (state) ->
 
 selectedCard = null
 click_hand = (card) ->
-    if deck_select || animating
+    if deck_select
         return null
     $("img.selected").removeClass("selected")
     unmark_field('cardTarget')
@@ -408,12 +438,15 @@ click_hand = (card) ->
         mark_field(month, true, 'cardTarget')
 
 click_field = (field) ->
-    if selectedCard == null
+    if selectedCard == null || field_locked
         return
 
-    unmark_field('cardTarget')
-    if field.data("suit") != "empty" && selectedCard.data("suit") != field.data("suit")
+    # Place on empty iff there are no possible matches
+    if field.data("suit") != "empty" && selectedCard.data("suit") != field.data("suit") ||
+            field.data("suit") == "empty" && get_suit(selectedCard.data("suit")).length > 0
         return null
+
+    unmark_field('cardTarget')
     if deck_select
         handID = -1
         card = deck_lift()
@@ -435,7 +468,7 @@ click_field = (field) ->
 # enter deck selection mode, where there are multiple options from the field to
 # match a card from the deck. The player can only take the deck card and match
 # it to field cards of the same suit.
-#
+
 deck_select = false
 deckselect_enable = (card) ->
     $("#deckCard").addClass("cardHighlight")
@@ -450,49 +483,10 @@ deckselect_enable = (card) ->
 deckselect_disable = (card) ->
     # restore the old state
     $("#deckCard").attr('src', "/img/back.gif")
-    $("#deckCard").removeClass("cardHighlight")
+    $("#deckCard").removeClass("cardHighlight cardTarget")
     deck_select = false
     unmark_field('cardHighlight')
     unmark_field('cardTarget')
-
-
-# User took one of their cards and placed it, either on a matched card on an
-# empty space. 
-# handID: ID of the card taken (-1 if it's from the deck, special case)
-# fieldID: ID of the card matched
-# Called from the field card droppable handler
-place = (handID, fieldID, el, tgt) ->
-    # This isn't cancelling right elsewhere
-    dragging = false
-    unmark_field()
-    if (deck_select)
-        el = lift_card(el)
-
-        dc = get_deckcard()
-        blank_card(dc)
-        dc.attr('src', "/img/back.gif")
-    else
-        extract_card(el)
-
-    el.css('top', tgt.top)
-    el.css('left', tgt.left)
-    el.css('opacity', 1.0)
-    # clear_suit(el); // this data is still useful
-    if (handID == -1)
-        el.attr('id', 'flyingDeckCard')
-    else
-        el.attr('id', 'flyingCard')
-
-    # special case, match deck to field
-    if (handID == -1)
-        # should set this up so it can be bounced, but meh
-        deckselect_disable()
-
-    data =
-        'type': 'place'
-        'hand': handID
-        'field': fieldID
-    wsock.send(JSON.stringify(data))
 
 ws_init = () ->
     wsock = new WebSocket(socket_url)

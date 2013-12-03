@@ -203,6 +203,14 @@ class Game(object):
         """
 
         # TODO: validation goes in here
+        
+        if len(self._search_field(self.hands[player][hand])) == 0 and\
+                self.field[field] is not None:
+                    raise GameError("Card placed when match is available")
+        # TESTING!!!
+        #if self.field[field] is not None and self.field[field] / 4 == 0:
+        #    raise GameError("January off limits.")
+
         print(self.hands[player])
         self.event("play_card", player, self.hands[player][hand], field)
 
@@ -315,8 +323,9 @@ class Game(object):
                 self.player ^= 1
                 self.state = States.PLAY
 
-        if self.scores[player] > 7:
+        if self.scores[player].get_score() > 7:
             self.multiplier[player] = 2
+            print("Multiplier at 2 for player %s" % player)
         # self.event("end_turn", player, None, [])
 
     def _search_field(self, suit):
