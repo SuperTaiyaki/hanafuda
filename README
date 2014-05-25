@@ -1,0 +1,6 @@
+Online hanafuda koikoi client.
+
+Build with cherrypy, mako templates, coffeescript and a pile of other stuff.
+
+Deployment stuff is targeted at OpenShift.
+
